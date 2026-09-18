@@ -57,13 +57,26 @@ export async function getAggregateByToken(token: string): Promise<AggregateGroup
 }
 
 export async function createAggregate(data: Partial<AggregateGroup> & { name: string }): Promise<AggregateGroup | null> {
+  const trimmedName = data.name.trim();
+  if (!trimmedName) {
+    throw new Error('聚合名称不能为空');
+  }
+
+  const allAggs = await getAllAggregates();
+  const duplicateNameAgg = allAggs.find(
+    (a) => a.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+  if (duplicateNameAgg) {
+    throw new Error(`聚合名称“${trimmedName}”已存在，请使用其他名称！`);
+  }
+
   const id = `agg_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const token = crypto.randomBytes(16).toString('hex');
   const now = new Date().toISOString();
 
   await db.insert(schema.aggregates).values({
     id,
-    name: data.name,
+    name: trimmedName,
     token, // Always generate a secure, random cryptographic token on creation
     subscriptionIds: JSON.stringify(data.subscriptionIds || []),
     filterKeywords: JSON.stringify(data.filterKeywords || []),
@@ -92,7 +105,19 @@ export async function updateAggregate(id: string, data: Partial<AggregateGroup>)
   const now = new Date().toISOString();
   const updateData: any = { updatedAt: now };
 
-  if (data.name !== undefined) updateData.name = data.name;
+  if (data.name !== undefined) {
+    const trimmedName = data.name.trim();
+    if (trimmedName) {
+      const allAggs = await getAllAggregates();
+      const duplicateNameAgg = allAggs.find(
+        (a) => a.id !== id && a.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (duplicateNameAgg) {
+        throw new Error(`聚合名称“${trimmedName}”已存在，请使用其他名称！`);
+      }
+      updateData.name = trimmedName;
+    }
+  }
   if (data.token !== undefined) updateData.token = data.token;
   if (data.subscriptionIds !== undefined) updateData.subscriptionIds = JSON.stringify(data.subscriptionIds);
   if (data.filterKeywords !== undefined) updateData.filterKeywords = JSON.stringify(data.filterKeywords);

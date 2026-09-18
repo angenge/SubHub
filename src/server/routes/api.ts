@@ -188,12 +188,12 @@ api.post('/subscriptions', async (c) => {
   try {
     const body = await c.req.json();
     if (!body.name || !body.url) {
-      return c.json({ success: false, message: 'Name and URL are required' }, 400);
+      return c.json({ success: false, message: '订阅名称和订阅链接为必填项' }, 400);
     }
     const sub = await createSubscription(body);
     return c.json({ success: true, data: sub });
   } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+    return c.json({ success: false, message: err.message }, 400);
   }
 });
 
@@ -204,7 +204,7 @@ api.put('/subscriptions/:id', async (c) => {
     const updated = await updateSubscriptionSettings(id, body);
     return c.json({ success: true, data: updated });
   } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+    return c.json({ success: false, message: err.message }, 400);
   }
 });
 
@@ -354,12 +354,12 @@ api.post('/aggregates', async (c) => {
   try {
     const body = await c.req.json();
     if (!body.name) {
-      return c.json({ success: false, message: 'Name is required' }, 400);
+      return c.json({ success: false, message: '聚合名称为必填项' }, 400);
     }
     const agg = await createAggregate(body);
     return c.json({ success: true, data: agg });
   } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+    return c.json({ success: false, message: err.message }, 400);
   }
 });
 
@@ -370,7 +370,7 @@ api.put('/aggregates/:id', async (c) => {
     const updated = await updateAggregate(id, body);
     return c.json({ success: true, data: updated });
   } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500);
+    return c.json({ success: false, message: err.message }, 400);
   }
 });
 

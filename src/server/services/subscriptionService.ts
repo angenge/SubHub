@@ -219,6 +219,30 @@ export async function createSubscription(data: {
   autoUpdate?: boolean;
   updateInterval?: number;
 }) {
+  const trimmedName = data.name.trim();
+  const trimmedUrl = data.url.trim();
+
+  if (!trimmedName || !trimmedUrl) {
+    throw new Error('订阅名称和订阅链接不能为空');
+  }
+
+  // 1. Check duplicate URL
+  const allSubs = await getAllSubscriptions();
+  const duplicateUrlSub = allSubs.find(
+    (s: any) => s.url.trim().toLowerCase() === trimmedUrl.toLowerCase()
+  );
+  if (duplicateUrlSub) {
+    throw new Error(`该订阅链接已存在（名称：“${duplicateUrlSub.name}”），请勿重复添加！`);
+  }
+
+  // 2. Check duplicate Name
+  const duplicateNameSub = allSubs.find(
+    (s: any) => s.name.trim().toLowerCase() === trimmedName.toLowerCase()
+  );
+  if (duplicateNameSub) {
+    throw new Error(`订阅名称“${trimmedName}”已存在，请使用其他名称！`);
+  }
+
   const id = `sub_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const now = new Date().toISOString();
 
@@ -233,7 +257,7 @@ export async function createSubscription(data: {
 
   const startTime = Date.now();
   try {
-    const result = await fetchRemoteSubscription(data.url, { userAgent: data.customUserAgent });
+    const result = await fetchRemoteSubscription(trimmedUrl, { userAgent: data.customUserAgent });
     durationMs = Date.now() - startTime;
     fetchedNodes = result.nodes;
     userinfo = result.userinfo;
@@ -248,8 +272,8 @@ export async function createSubscription(data: {
 
   await db.insert(schema.subscriptions).values({
     id,
-    name: data.name.trim(),
-    url: data.url.trim(),
+    name: trimmedName,
+    url: trimmedUrl,
     customUserAgent: data.customUserAgent?.trim() || null,
     autoUpdate: data.autoUpdate !== false,
     updateInterval: data.updateInterval || 360,
@@ -523,7 +547,16 @@ export async function updateSubscriptionSettings(id: string, data: {
 
   if (typeof data.name === 'string') {
     const trimmedName = data.name.trim();
-    if (trimmedName) updatePayload.name = trimmedName;
+    if (trimmedName) {
+      const allSubs = await getAllSubscriptions();
+      const duplicateNameSub = allSubs.find(
+        (s: any) => s.id !== id && s.name.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (duplicateNameSub) {
+        throw new Error(`订阅名称“${trimmedName}”已存在，请使用其他名称！`);
+      }
+      updatePayload.name = trimmedName;
+    }
   }
 
   let isUrlChanged = false;
@@ -531,6 +564,13 @@ export async function updateSubscriptionSettings(id: string, data: {
     const trimmedUrl = data.url.trim();
     if (trimmedUrl && trimmedUrl !== existing.url.trim()) {
       validateSubscriptionUrl(trimmedUrl);
+      const allSubs = await getAllSubscriptions();
+      const duplicateUrlSub = allSubs.find(
+        (s: any) => s.id !== id && s.url.trim().toLowerCase() === trimmedUrl.toLowerCase()
+      );
+      if (duplicateUrlSub) {
+        throw new Error(`该订阅链接已存在（名称：“${duplicateUrlSub.name}”），请勿重复配置！`);
+      }
       updatePayload.url = trimmedUrl;
       updatePayload.etag = null;
       updatePayload.lastModified = null;

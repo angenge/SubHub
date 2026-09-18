@@ -625,6 +625,74 @@ proxies:
     }
   });
 
+  await runAsyncTest('Security & Integrity', '防止相同订阅链接与重复订阅名称重复添加 (Anti-Duplicate Check)', async () => {
+    const { createSubscription, deleteSubscription } = await import('../../server/services/subscriptionService.js');
+    const { createAggregate, deleteAggregate } = await import('../../server/services/aggregateService.js');
+
+    // 1. Add subscription 1
+    const sub1 = await createSubscription({
+      name: '测试唯一订阅A',
+      url: 'https://example.com/unique-sub-1',
+    });
+
+    try {
+      // Try adding duplicate URL with different name
+      let duplicateUrlCaught = false;
+      try {
+        await createSubscription({
+          name: '测试唯一订阅B',
+          url: 'https://example.com/unique-sub-1',
+        });
+      } catch (err: any) {
+        if (err.message.includes('该订阅链接已存在')) {
+          duplicateUrlCaught = true;
+        }
+      }
+      if (!duplicateUrlCaught) throw new Error('未能拦截重复的订阅 URL');
+
+      // Try adding duplicate name with different URL
+      let duplicateNameCaught = false;
+      try {
+        await createSubscription({
+          name: '测试唯一订阅A',
+          url: 'https://example.com/unique-sub-2',
+        });
+      } catch (err: any) {
+        if (err.message.includes('订阅名称“测试唯一订阅A”已存在')) {
+          duplicateNameCaught = true;
+        }
+      }
+      if (!duplicateNameCaught) throw new Error('未能拦截重复的订阅名称');
+    } finally {
+      if (sub1?.id) {
+        await deleteSubscription(sub1.id);
+      }
+    }
+
+    // 2. Add aggregate 1
+    const agg1 = await createAggregate({
+      name: '测试唯一聚合组',
+    });
+
+    try {
+      let duplicateAggCaught = false;
+      try {
+        await createAggregate({
+          name: '测试唯一聚合组',
+        });
+      } catch (err: any) {
+        if (err.message.includes('聚合名称“测试唯一聚合组”已存在')) {
+          duplicateAggCaught = true;
+        }
+      }
+      if (!duplicateAggCaught) throw new Error('未能拦截重复的聚合名称');
+    } finally {
+      if (agg1?.id) {
+        await deleteAggregate(agg1.id);
+      }
+    }
+  });
+
   // ----------------------------------------------------
   // Category 5: User-Agent Auto-Detection & Format Routing
   // ----------------------------------------------------
