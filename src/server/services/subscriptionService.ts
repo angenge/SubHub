@@ -388,12 +388,23 @@ export async function saveSubscriptionNodes(subscriptionId: string, nodes: Proxy
     });
   }
 
-  // Insert in chunks of 50
-  const CHUNK_SIZE = 50;
+  // Safe chunk size for Cloudflare D1 (each node has 28 columns; 3 nodes = 84 SQL variables < 100 limit)
+  const CHUNK_SIZE = 3;
   for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
     const chunk = toInsert.slice(i, i + CHUNK_SIZE);
     if (chunk.length > 0) {
-      await db.insert(schema.nodes).values(chunk);
+      try {
+        await db.insert(schema.nodes).values(chunk);
+      } catch (chunkErr) {
+        // Fallback to inserting 1 by 1 if batch chunk fails
+        for (const singleNode of chunk) {
+          try {
+            await db.insert(schema.nodes).values(singleNode);
+          } catch (singleErr: any) {
+            console.error('Failed to insert single node:', singleErr.message);
+          }
+        }
+      }
     }
   }
 }
