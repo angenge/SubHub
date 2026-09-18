@@ -4,9 +4,15 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { api } from './routes/api.js';
 import { subRouter } from './routes/sub.js';
-import { initScheduler } from './scheduler/cron.js';
+import { initNodeScheduler } from './scheduler/cron.node.js';
+import { initNodeDatabase } from './db/node.js';
+import { setDefaultDb } from './db/index.js';
 import path from 'path';
 import fs from 'fs';
+
+// Initialize SQLite for Node.js
+const { db: nodeDb } = initNodeDatabase();
+setDefaultDb(nodeDb);
 
 const app = new Hono();
 
@@ -66,7 +72,7 @@ if (fs.existsSync(clientDist)) {
 }
 
 // Start Scheduler
-initScheduler();
+initNodeScheduler();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';

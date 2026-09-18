@@ -7,30 +7,34 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // In-memory token revocation blacklist: token -> expiry timestamp (ms)
 const revokedTokens = new Map<string, number>();
 
-// Periodic cleanup of expired revoked tokens to bound memory growth
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, exp] of revokedTokens) {
-    if (now > exp) {
-      revokedTokens.delete(token);
+// Periodic cleanup of expired revoked tokens on Node.js (avoid global timers on CF Workers)
+const isNodeEnv = typeof process !== 'undefined' && process.versions && !!process.versions.node && typeof (globalThis as any).WebSocketPair === 'undefined';
+if (isNodeEnv && typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [token, exp] of revokedTokens) {
+      if (now > exp) {
+        revokedTokens.delete(token);
+      }
     }
-  }
-}, 5 * 60 * 1000).unref();
+  }, 5 * 60 * 1000).unref?.();
+}
 
 function normalizeToken(token?: string | null): string {
   if (!token) return '';
   return token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
 }
 
-function getOrInitSecret(): string {
+async function getOrInitSecret(): Promise<string> {
   try {
-    const existing = db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret')).get();
+    const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret'));
+    const existing = rows[0];
     if (existing && existing.value) {
       return existing.value;
     }
     const newSecret = crypto.randomBytes(32).toString('hex');
     const now = new Date().toISOString();
-    db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now }).run();
+    await db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now });
     return newSecret;
   } catch {
     return 'fallback_subhub_secret_key_fixed';
@@ -41,9 +45,10 @@ function hashPassword(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha256').toString('hex');
 }
 
-export function getAuthStatus(): { initialized: boolean; hasPasswordEnv: boolean } {
+export async function getAuthStatus(): Promise<{ initialized: boolean; hasPasswordEnv: boolean }> {
   const envPass = process.env.ADMIN_PASSWORD;
-  const dbSetting = db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth')).get();
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth'));
+  const dbSetting = rows[0];
 
   return {
     initialized: !!(envPass || dbSetting),
@@ -51,44 +56,47 @@ export function getAuthStatus(): { initialized: boolean; hasPasswordEnv: boolean
   };
 }
 
-export function initOrUpdatePassword(password: string): boolean {
+export async function initOrUpdatePassword(password: string): Promise<boolean> {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = hashPassword(password, salt);
   const value = JSON.stringify({ salt, hash });
   const now = new Date().toISOString();
 
-  const existing = db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth')).get();
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth'));
+  const existing = rows[0];
   if (existing) {
-    db.update(schema.settings)
+    await db
+      .update(schema.settings)
       .set({ value, updatedAt: now })
-      .where(eq(schema.settings.key, 'admin_auth'))
-      .run();
+      .where(eq(schema.settings.key, 'admin_auth'));
   } else {
-    db.insert(schema.settings)
-      .values({ key: 'admin_auth', value, updatedAt: now })
-      .run();
+    await db
+      .insert(schema.settings)
+      .values({ key: 'admin_auth', value, updatedAt: now });
   }
 
   // Rotate session secret to invalidate older sessions upon password change
   const newSecret = crypto.randomBytes(32).toString('hex');
-  const existingSecret = db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret')).get();
+  const secretRows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret'));
+  const existingSecret = secretRows[0];
   if (existingSecret) {
-    db.update(schema.settings).set({ value: newSecret, updatedAt: now }).where(eq(schema.settings.key, 'session_secret')).run();
+    await db.update(schema.settings).set({ value: newSecret, updatedAt: now }).where(eq(schema.settings.key, 'session_secret'));
   } else {
-    db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now }).run();
+    await db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now });
   }
 
   return true;
 }
 
-export function verifyPassword(password: string): boolean {
+export async function verifyPassword(password: string): Promise<boolean> {
   // 1. Check environment variable first if set
   if (process.env.ADMIN_PASSWORD) {
     return process.env.ADMIN_PASSWORD === password;
   }
 
   // 2. Check Database Setting
-  const setting = db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth')).get();
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'admin_auth'));
+  const setting = rows[0];
   if (!setting) {
     return false;
   }
@@ -102,8 +110,8 @@ export function verifyPassword(password: string): boolean {
   }
 }
 
-export function createSessionToken(): string {
-  const secret = getOrInitSecret();
+export async function createSessionToken(): Promise<string> {
+  const secret = await getOrInitSecret();
   const payload = {
     iat: Date.now(),
     exp: Date.now() + SESSION_TTL_MS,
@@ -114,7 +122,7 @@ export function createSessionToken(): string {
   return `${payloadB64}.${signature}`;
 }
 
-export function validateSessionToken(token?: string | null): boolean {
+export async function validateSessionToken(token?: string | null): Promise<boolean> {
   const cleanToken = normalizeToken(token);
   if (!cleanToken) return false;
 
@@ -126,7 +134,7 @@ export function validateSessionToken(token?: string | null): boolean {
 
   const [payloadB64, signature] = parts;
   try {
-    const secret = getOrInitSecret();
+    const secret = await getOrInitSecret();
     const expectedSig = crypto.createHmac('sha256', secret).update(payloadB64).digest('base64url');
     if (signature !== expectedSig) return false;
 
@@ -143,15 +151,12 @@ export function revokeSessionToken(token?: string | null) {
   const cleanToken = normalizeToken(token);
   if (!cleanToken) return;
 
-  // Extract expiry from token payload to schedule blacklist cleanup
   try {
     const payloadB64 = cleanToken.split('.')[0];
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
     const exp = typeof payload.exp === 'number' ? payload.exp : Date.now() + SESSION_TTL_MS;
     revokedTokens.set(cleanToken, exp);
   } catch {
-    // If we cannot parse the token, still mark it revoked forever
-    // (it won't validate anyway, and cleanup guard below keeps map bounded)
     revokedTokens.set(cleanToken, Date.now() + SESSION_TTL_MS);
   }
 }

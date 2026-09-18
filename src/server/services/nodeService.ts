@@ -1,5 +1,5 @@
-import { eq, inArray } from 'drizzle-orm';
-import { db, sqlite, schema } from '../db/index.js';
+import { eq } from 'drizzle-orm';
+import { db, schema } from '../db/index.js';
 import { ProxyNode, PingResult } from '../../core/types/index.js';
 import { batchPingNodes, pingNode } from '../../core/ping/index.js';
 
@@ -44,12 +44,14 @@ export function parseDbNode(raw: any): ProxyNode {
   };
 }
 
-export function getAllNodes(subscriptionId?: string): ProxyNode[] {
+export async function getAllNodes(subscriptionId?: string): Promise<ProxyNode[]> {
   let query = db.select().from(schema.nodes);
   if (subscriptionId) {
-    return query.where(eq(schema.nodes.subscriptionId, subscriptionId)).all().map(parseDbNode);
+    const rows = await query.where(eq(schema.nodes.subscriptionId, subscriptionId));
+    return rows.map(parseDbNode);
   }
-  return query.all().map(parseDbNode);
+  const rows = await query;
+  return rows.map(parseDbNode);
 }
 
 export interface NodeFilterParams {
@@ -62,17 +64,17 @@ export interface NodeFilterParams {
   pageSize?: number;
 }
 
-export function getPaginatedNodes(params: NodeFilterParams): {
+export async function getPaginatedNodes(params: NodeFilterParams): Promise<{
   items: ProxyNode[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
-} {
+}> {
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = Math.max(1, Math.min(Number(params.pageSize) || 50, 500));
 
-  let nodes = getAllNodes(params.subscriptionId);
+  let nodes = await getAllNodes(params.subscriptionId);
 
   if (params.protocol && params.protocol !== 'all') {
     const proto = params.protocol.toLowerCase();
@@ -110,43 +112,32 @@ export function getPaginatedNodes(params: NodeFilterParams): {
   };
 }
 
-export function getNodeById(id: string): ProxyNode | null {
-  const row = db.select().from(schema.nodes).where(eq(schema.nodes.id, id)).get();
+export async function getNodeById(id: string): Promise<ProxyNode | null> {
+  const rows = await db.select().from(schema.nodes).where(eq(schema.nodes.id, id));
+  const row = rows[0];
   return row ? parseDbNode(row) : null;
 }
 
-export function updateNodePingResult(res: PingResult) {
-  db.update(schema.nodes).set({
+export async function updateNodePingResult(res: PingResult) {
+  await db.update(schema.nodes).set({
     ping: res.ping,
     status: res.status,
     lastCheckedAt: res.checkedAt,
-  }).where(eq(schema.nodes.id, res.nodeId)).run();
+  }).where(eq(schema.nodes.id, res.nodeId));
 }
 
-export function batchUpdatePingResults(results: PingResult[]) {
+export async function batchUpdatePingResults(results: PingResult[]) {
   if (results.length === 0) return;
-  try {
-    const updateStmt = sqlite.prepare(
-      'UPDATE nodes SET ping = ?, status = ?, last_checked_at = ? WHERE id = ?'
-    );
-    const transaction = sqlite.transaction((items: PingResult[]) => {
-      for (const item of items) {
-        updateStmt.run(item.ping, item.status, item.checkedAt, item.nodeId);
-      }
-    });
-    transaction(results);
-  } catch {
-    for (const item of results) {
-      updateNodePingResult(item);
-    }
+  for (const item of results) {
+    await updateNodePingResult(item);
   }
 }
 
 export async function pingSingleNode(id: string): Promise<PingResult> {
-  const node = getNodeById(id);
+  const node = await getNodeById(id);
   if (!node) throw new Error('Node not found');
   const res = await pingNode(node);
-  updateNodePingResult(res);
+  await updateNodePingResult(res);
   return res;
 }
 
@@ -154,44 +145,42 @@ export async function pingAllNodes(
   subscriptionId?: string,
   onProgress?: (progress: { current: number; total: number; result: PingResult }) => void
 ): Promise<PingResult[]> {
-  const nodes = getAllNodes(subscriptionId);
+  const nodes = await getAllNodes(subscriptionId);
   const pendingUpdates: PingResult[] = [];
   let lastFlush = Date.now();
 
-  const flushUpdates = () => {
+  const flushUpdates = async () => {
     if (pendingUpdates.length > 0) {
       const chunk = pendingUpdates.splice(0, pendingUpdates.length);
-      batchUpdatePingResults(chunk);
+      await batchUpdatePingResults(chunk);
     }
   };
 
-  const results = await batchPingNodes(nodes, 25, 2500, (prog) => {
+  const results = await batchPingNodes(nodes, 25, 2500, async (prog) => {
     pendingUpdates.push(prog.result);
     if (Date.now() - lastFlush > 300 || pendingUpdates.length >= 20) {
       lastFlush = Date.now();
-      flushUpdates();
+      await flushUpdates();
     }
     if (onProgress) onProgress(prog);
   });
 
-  flushUpdates();
+  await flushUpdates();
   return results;
 }
 
-export function deleteNode(id: string) {
-  const node = getNodeById(id);
+export async function deleteNode(id: string) {
+  const node = await getNodeById(id);
   if (node) {
-    db.delete(schema.nodes).where(eq(schema.nodes.id, id)).run();
+    await db.delete(schema.nodes).where(eq(schema.nodes.id, id));
     if (node.subscriptionId) {
-      const remaining = db
+      const remaining = await db
         .select()
         .from(schema.nodes)
-        .where(eq(schema.nodes.subscriptionId, node.subscriptionId))
-        .all();
-      db.update(schema.subscriptions)
+        .where(eq(schema.nodes.subscriptionId, node.subscriptionId));
+      await db.update(schema.subscriptions)
         .set({ nodeCount: remaining.length, updatedAt: new Date().toISOString() })
-        .where(eq(schema.subscriptions.id, node.subscriptionId))
-        .run();
+        .where(eq(schema.subscriptions.id, node.subscriptionId));
     }
   }
   return { success: true };

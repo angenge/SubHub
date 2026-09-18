@@ -1,9 +1,8 @@
 import { eq } from 'drizzle-orm';
-import { db, sqlite, schema } from '../db/index.js';
+import { db, schema } from '../db/index.js';
 import { parseNodesFromContent, parseSubscriptionUserInfo } from '../../core/parsers/index.js';
 import { ProxyNode } from '../../core/types/index.js';
 import crypto from 'crypto';
-
 import net from 'net';
 
 const DEFAULT_UA = 'ClashMeta/v1.18.0 (SubHub Aggregator)';
@@ -98,11 +97,13 @@ export async function fetchRemoteSubscription(
     lastModified?: string | null;
   } = {}
 ) {
-  const validatedUrl = validateSubscriptionUrl(url).toString();
-  const ua = options.userAgent || DEFAULT_UA;
+  const targetUrl = validateSubscriptionUrl(url);
+
   const headers: Record<string, string> = {
-    'User-Agent': ua,
+    'User-Agent': options.userAgent || DEFAULT_UA,
     'Accept': '*/*',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Connection': 'keep-alive',
   };
 
   if (options.etag) {
@@ -113,32 +114,35 @@ export async function fetchRemoteSubscription(
   }
 
   try {
-    const res = await fetch(validatedUrl, {
+    const res = await fetch(targetUrl.toString(), {
       headers,
+      redirect: 'follow',
       signal: AbortSignal.timeout(20000), // 20s timeout
     });
 
-    const userinfo = parseSubscriptionUserInfo(res.headers.get('subscription-userinfo'));
-
-    // 304 Not Modified: Resource has not changed on server
     if (res.status === 304) {
       return {
         notModified: true,
-        userinfo,
+        nodes: [] as ProxyNode[],
+        userinfo: null,
         etag: options.etag,
         lastModified: options.lastModified,
-        nodes: [] as ProxyNode[],
         rawContent: '',
         httpStatus: 304,
       };
     }
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      throw new Error(`HTTP 响应错误状态: ${res.status} ${res.statusText}`);
     }
 
-    const newEtag = res.headers.get('etag') || undefined;
-    const newLastModified = res.headers.get('last-modified') || undefined;
+    const newEtag = res.headers.get('etag') || null;
+    const newLastModified = res.headers.get('last-modified') || null;
+
+    // Parse Subscription-Userinfo header if present
+    const userInfoHeader = res.headers.get('subscription-userinfo');
+    const userinfo = userInfoHeader ? parseSubscriptionUserInfo(userInfoHeader) : null;
+
     const content = await res.text();
     const nodes = parseNodesFromContent(content);
 
@@ -159,7 +163,7 @@ export async function fetchRemoteSubscription(
   }
 }
 
-export function recordSyncLog(data: {
+export async function recordSyncLog(data: {
   subscriptionId: string;
   subscriptionName: string;
   triggerType: 'manual' | 'cron';
@@ -172,7 +176,7 @@ export function recordSyncLog(data: {
 }) {
   const id = `slog_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const now = new Date().toISOString();
-  db.insert(schema.syncLogs).values({
+  await db.insert(schema.syncLogs).values({
     id,
     subscriptionId: data.subscriptionId,
     subscriptionName: data.subscriptionName,
@@ -184,42 +188,26 @@ export function recordSyncLog(data: {
     nodeDiff: data.nodeDiff ?? 0,
     errorMessage: data.errorMessage,
     createdAt: now,
-  }).run();
-
-  // Auto rotate: keep latest 1000 sync logs to bound DB size
-  try {
-    sqlite.prepare(`
-      DELETE FROM sync_logs
-      WHERE id NOT IN (
-        SELECT id FROM sync_logs ORDER BY created_at DESC LIMIT 1000
-      )
-    `).run();
-  } catch {}
+  });
 }
 
-export function getSyncLogs(subscriptionId?: string, limit: number = 100) {
+export async function getSyncLogs(subscriptionId?: string, limit: number = 100) {
   if (subscriptionId) {
-    return db
+    const rows = await db
       .select()
       .from(schema.syncLogs)
-      .where(eq(schema.syncLogs.subscriptionId, subscriptionId))
-      .all()
-      .reverse()
-      .slice(0, limit);
+      .where(eq(schema.syncLogs.subscriptionId, subscriptionId));
+    return rows.reverse().slice(0, limit);
   }
-  return db
-    .select()
-    .from(schema.syncLogs)
-    .all()
-    .reverse()
-    .slice(0, limit);
+  const rows = await db.select().from(schema.syncLogs);
+  return rows.reverse().slice(0, limit);
 }
 
-export function clearSyncLogs(subscriptionId?: string) {
+export async function clearSyncLogs(subscriptionId?: string) {
   if (subscriptionId) {
-    db.delete(schema.syncLogs).where(eq(schema.syncLogs.subscriptionId, subscriptionId)).run();
+    await db.delete(schema.syncLogs).where(eq(schema.syncLogs.subscriptionId, subscriptionId));
   } else {
-    db.delete(schema.syncLogs).run();
+    await db.delete(schema.syncLogs);
   }
   return { success: true };
 }
@@ -247,30 +235,29 @@ export async function createSubscription(data: {
   try {
     const result = await fetchRemoteSubscription(data.url, { userAgent: data.customUserAgent });
     durationMs = Date.now() - startTime;
-    httpStatus = result.httpStatus;
     fetchedNodes = result.nodes;
     userinfo = result.userinfo;
     etag = result.etag || undefined;
     lastModified = result.lastModified || undefined;
+    httpStatus = result.httpStatus;
   } catch (err: any) {
     durationMs = Date.now() - startTime;
     status = 'error';
-    errorMessage = err.message || 'Fetch failed';
+    errorMessage = err.message || 'Initial sync failed';
   }
 
-  // Insert subscription
-  db.insert(schema.subscriptions).values({
+  await db.insert(schema.subscriptions).values({
     id,
-    name: data.name,
-    url: data.url,
-    customUserAgent: data.customUserAgent,
-    autoUpdate: data.autoUpdate ?? true,
+    name: data.name.trim(),
+    url: data.url.trim(),
+    customUserAgent: data.customUserAgent?.trim() || null,
+    autoUpdate: data.autoUpdate !== false,
     updateInterval: data.updateInterval || 360,
-    lastUpdatedAt: now,
-    upload: userinfo?.upload || 0,
-    download: userinfo?.download || 0,
-    total: userinfo?.total || 0,
-    expire: userinfo?.expire || 0,
+    lastUpdatedAt: status === 'active' ? now : null,
+    upload: userinfo?.upload ?? 0,
+    download: userinfo?.download ?? 0,
+    total: userinfo?.total ?? 0,
+    expire: userinfo?.expire ?? 0,
     nodeCount: fetchedNodes.length,
     etag: etag || null,
     lastModified: lastModified || null,
@@ -278,17 +265,16 @@ export async function createSubscription(data: {
     errorMessage: errorMessage || null,
     createdAt: now,
     updatedAt: now,
-  }).run();
+  });
 
   if (fetchedNodes.length > 0) {
-    saveSubscriptionNodes(id, fetchedNodes);
+    await saveSubscriptionNodes(id, fetchedNodes);
   }
 
-  // Write sync log
   try {
-    recordSyncLog({
+    await recordSyncLog({
       subscriptionId: id,
-      subscriptionName: data.name,
+      subscriptionName: data.name.trim(),
       triggerType: 'manual',
       status: status === 'active' ? 'success' : 'failed',
       httpStatus,
@@ -304,112 +290,101 @@ export async function createSubscription(data: {
   return getSubscriptionById(id);
 }
 
-export function saveSubscriptionNodes(subscriptionId: string, nodes: ProxyNode[]) {
-  const insertStmt = sqlite.prepare(`
-    INSERT INTO nodes (
-      id, subscription_id, name, type, server, port, uuid, password, cipher,
-      alter_id, network, tls, sni, alpn, skip_cert_verify, flow, reality,
-      ws_opts, grpc_opts, hy2_opts, udp, country, country_code, ping,
-      last_checked_at, status, raw_uri, raw_data
-    ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?
-    )
-  `);
+export async function saveSubscriptionNodes(subscriptionId: string, nodes: ProxyNode[]) {
+  // 1. Read existing health state to preserve ping and status across refreshes
+  const existingRows = await db
+    .select({
+      id: schema.nodes.id,
+      ping: schema.nodes.ping,
+      status: schema.nodes.status,
+      lastCheckedAt: schema.nodes.lastCheckedAt,
+    })
+    .from(schema.nodes)
+    .where(eq(schema.nodes.subscriptionId, subscriptionId));
 
-  const selectExistingStmt = sqlite.prepare(`
-    SELECT id, ping, status, last_checked_at FROM nodes WHERE subscription_id = ?
-  `);
+  const existingHealthMap = new Map<string, { ping: number | null; status: string; lastCheckedAt: string | null }>();
+  for (const row of existingRows) {
+    existingHealthMap.set(row.id, {
+      ping: row.ping,
+      status: (row.status as any) || 'unknown',
+      lastCheckedAt: row.lastCheckedAt,
+    });
+  }
 
-  const deleteStmt = sqlite.prepare(`DELETE FROM nodes WHERE subscription_id = ?`);
+  // 2. Delete old nodes for this subscription
+  await db.delete(schema.nodes).where(eq(schema.nodes.subscriptionId, subscriptionId));
 
-  const transaction = sqlite.transaction((subId: string, nodeList: ProxyNode[]) => {
-    // 1. Read existing health state to preserve ping and status across refreshes
-    const existingRows = selectExistingStmt.all(subId) as Array<{
-      id: string;
-      ping: number | null;
-      status: string | null;
-      last_checked_at: string | null;
-    }>;
-    const existingHealthMap = new Map<string, { ping: number | null; status: string; lastCheckedAt: string | null }>();
-    for (const row of existingRows) {
-      existingHealthMap.set(row.id, {
-        ping: row.ping,
-        status: (row.status as any) || 'unknown',
-        lastCheckedAt: row.last_checked_at,
-      });
+  const insertedInThisBatch = new Set<string>();
+  const toInsert: any[] = [];
+
+  for (const node of nodes) {
+    let rawBaseId = node.id || `node_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+    let scopedNodeId = `${rawBaseId}_${subscriptionId.slice(0, 8)}`;
+
+    if (insertedInThisBatch.has(scopedNodeId)) {
+      scopedNodeId = `${scopedNodeId}_${Math.random().toString(36).slice(2, 6)}`;
     }
+    insertedInThisBatch.add(scopedNodeId);
 
-    // 2. Atomically delete old nodes for this subscription
-    deleteStmt.run(subId);
+    const prevHealth = existingHealthMap.get(scopedNodeId) || existingHealthMap.get(rawBaseId);
 
-    const insertedInThisBatch = new Set<string>();
+    const ping = node.ping !== undefined ? node.ping : (prevHealth?.ping ?? null);
+    const status = (node.status && node.status !== 'unknown') ? node.status : (prevHealth?.status || 'unknown');
+    const lastCheckedAt = node.lastCheckedAt || prevHealth?.lastCheckedAt || null;
 
-    for (const node of nodeList) {
-      // Namespace node ID by subscription to guarantee uniqueness across different subscriptions
-      let rawBaseId = node.id || `node_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-      let scopedNodeId = `${rawBaseId}_${subId.slice(0, 8)}`;
+    toInsert.push({
+      id: scopedNodeId,
+      subscriptionId,
+      name: node.name || 'Unnamed Proxy',
+      type: node.type,
+      server: node.server,
+      port: node.port,
+      uuid: node.uuid || null,
+      password: node.password || null,
+      cipher: node.cipher || null,
+      alterId: node.alterId ?? null,
+      network: node.network || null,
+      tls: node.tls ? true : false,
+      sni: node.sni || null,
+      alpn: node.alpn ? JSON.stringify(node.alpn) : null,
+      skipCertVerify: node.skipCertVerify ? true : false,
+      flow: node.flow || null,
+      reality: node.reality ? JSON.stringify(node.reality) : null,
+      wsOpts: node.wsOpts ? JSON.stringify(node.wsOpts) : null,
+      grpcOpts: node.grpcOpts ? JSON.stringify(node.grpcOpts) : null,
+      hy2Opts: node.hy2Opts ? JSON.stringify(node.hy2Opts) : null,
+      udp: node.udp !== false,
+      country: node.country || null,
+      countryCode: node.countryCode || null,
+      ping,
+      lastCheckedAt,
+      status,
+      rawUri: node.rawUri || null,
+      rawData: JSON.stringify(node),
+    });
+  }
 
-      // Guard against exact duplicates within the same subscription
-      if (insertedInThisBatch.has(scopedNodeId)) {
-        scopedNodeId = `${scopedNodeId}_${Math.random().toString(36).slice(2, 6)}`;
-      }
-      insertedInThisBatch.add(scopedNodeId);
-
-      const prevHealth = existingHealthMap.get(scopedNodeId) || existingHealthMap.get(rawBaseId);
-
-      const ping = node.ping !== undefined ? node.ping : (prevHealth?.ping ?? null);
-      const status = (node.status && node.status !== 'unknown') ? node.status : (prevHealth?.status || 'unknown');
-      const lastCheckedAt = node.lastCheckedAt || prevHealth?.lastCheckedAt || null;
-
-      insertStmt.run(
-        scopedNodeId,
-        subId,
-        node.name || 'Unnamed Proxy',
-        node.type,
-        node.server,
-        node.port,
-        node.uuid || null,
-        node.password || null,
-        node.cipher || null,
-        node.alterId ?? null,
-        node.network || null,
-        node.tls ? 1 : 0,
-        node.sni || null,
-        node.alpn ? JSON.stringify(node.alpn) : null,
-        node.skipCertVerify ? 1 : 0,
-        node.flow || null,
-        node.reality ? JSON.stringify(node.reality) : null,
-        node.wsOpts ? JSON.stringify(node.wsOpts) : null,
-        node.grpcOpts ? JSON.stringify(node.grpcOpts) : null,
-        node.hy2Opts ? JSON.stringify(node.hy2Opts) : null,
-        node.udp !== false ? 1 : 0,
-        node.country || null,
-        node.countryCode || null,
-        ping,
-        lastCheckedAt,
-        status,
-        node.rawUri || null,
-        JSON.stringify(node)
-      );
+  // Insert in chunks of 50
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
+    const chunk = toInsert.slice(i, i + CHUNK_SIZE);
+    if (chunk.length > 0) {
+      await db.insert(schema.nodes).values(chunk);
     }
-  });
-
-  transaction(subscriptionId, nodes);
+  }
 }
 
-export function getSubscriptionById(id: string) {
-  return db.select().from(schema.subscriptions).where(eq(schema.subscriptions.id, id)).get();
+export async function getSubscriptionById(id: string) {
+  const rows = await db.select().from(schema.subscriptions).where(eq(schema.subscriptions.id, id));
+  return rows[0] || null;
 }
 
-export function getAllSubscriptions() {
-  return db.select().from(schema.subscriptions).all();
+export async function getAllSubscriptions() {
+  return await db.select().from(schema.subscriptions);
 }
 
 export async function refreshSubscription(id: string, triggerType: 'manual' | 'cron' = 'manual') {
-  const sub = getSubscriptionById(id);
+  const sub = await getSubscriptionById(id);
   if (!sub) throw new Error('Subscription not found');
 
   const now = new Date().toISOString();
@@ -426,7 +401,7 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
 
     if (result.notModified) {
       // 304: Nodes remain unchanged, update lastUpdatedAt & userinfo
-      db.update(schema.subscriptions).set({
+      await db.update(schema.subscriptions).set({
         lastUpdatedAt: now,
         upload: result.userinfo?.upload ?? sub.upload,
         download: result.userinfo?.download ?? sub.download,
@@ -435,9 +410,9 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
         status: 'active',
         errorMessage: null,
         updatedAt: now,
-      }).where(eq(schema.subscriptions.id, id)).run();
+      }).where(eq(schema.subscriptions.id, id));
 
-      recordSyncLog({
+      await recordSyncLog({
         subscriptionId: id,
         subscriptionName: sub.name,
         triggerType,
@@ -453,9 +428,9 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
 
     // 200 OK: New nodes fetched
     const previousCount = sub.nodeCount || 0;
-    saveSubscriptionNodes(id, result.nodes);
+    await saveSubscriptionNodes(id, result.nodes);
 
-    db.update(schema.subscriptions).set({
+    await db.update(schema.subscriptions).set({
       lastUpdatedAt: now,
       upload: result.userinfo?.upload ?? sub.upload,
       download: result.userinfo?.download ?? sub.download,
@@ -467,9 +442,9 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
       status: 'active',
       errorMessage: null,
       updatedAt: now,
-    }).where(eq(schema.subscriptions.id, id)).run();
+    }).where(eq(schema.subscriptions.id, id));
 
-    recordSyncLog({
+    await recordSyncLog({
       subscriptionId: id,
       subscriptionName: sub.name,
       triggerType,
@@ -484,13 +459,13 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
   } catch (err: any) {
     durationMs = Date.now() - startTime;
     // Graceful fallback on failure: KEEP existing cached nodes in DB!
-    db.update(schema.subscriptions).set({
+    await db.update(schema.subscriptions).set({
       status: 'error',
       errorMessage: err.message || 'Refresh failed',
       updatedAt: now,
-    }).where(eq(schema.subscriptions.id, id)).run();
+    }).where(eq(schema.subscriptions.id, id));
 
-    recordSyncLog({
+    await recordSyncLog({
       subscriptionId: id,
       subscriptionName: sub.name,
       triggerType,
@@ -505,24 +480,23 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
   }
 }
 
-export function deleteSubscription(id: string) {
-  db.delete(schema.nodes).where(eq(schema.nodes.subscriptionId, id)).run();
-  db.delete(schema.syncLogs).where(eq(schema.syncLogs.subscriptionId, id)).run();
-  db.delete(schema.subscriptions).where(eq(schema.subscriptions.id, id)).run();
+export async function deleteSubscription(id: string) {
+  await db.delete(schema.nodes).where(eq(schema.nodes.subscriptionId, id));
+  await db.delete(schema.syncLogs).where(eq(schema.syncLogs.subscriptionId, id));
+  await db.delete(schema.subscriptions).where(eq(schema.subscriptions.id, id));
 
   // Clean up any dangling references to this subscription in aggregates
   try {
-    const allAggs = db.select().from(schema.aggregates).all();
+    const allAggs = await db.select().from(schema.aggregates);
     for (const agg of allAggs) {
       if (!agg.subscriptionIds) continue;
       try {
         const ids: string[] = JSON.parse(agg.subscriptionIds);
         if (Array.isArray(ids) && ids.includes(id)) {
-          const cleanedIds = ids.filter((subId) => subId !== id);
-          db.update(schema.aggregates)
+          const cleanedIds = ids.filter((subId: string) => subId !== id);
+          await db.update(schema.aggregates)
             .set({ subscriptionIds: JSON.stringify(cleanedIds), updatedAt: new Date().toISOString() })
-            .where(eq(schema.aggregates.id, agg.id))
-            .run();
+            .where(eq(schema.aggregates.id, agg.id));
         }
       } catch {}
     }
@@ -539,7 +513,7 @@ export async function updateSubscriptionSettings(id: string, data: {
   updateInterval?: number;
   status?: 'active' | 'error' | 'disabled';
 }) {
-  const existing = getSubscriptionById(id);
+  const existing = await getSubscriptionById(id);
   if (!existing) throw new Error('Subscription not found');
 
   const now = new Date().toISOString();
@@ -556,7 +530,6 @@ export async function updateSubscriptionSettings(id: string, data: {
   if (typeof data.url === 'string') {
     const trimmedUrl = data.url.trim();
     if (trimmedUrl && trimmedUrl !== existing.url.trim()) {
-      // Validate the new URL to prevent malformed or invalid schemes
       validateSubscriptionUrl(trimmedUrl);
       updatePayload.url = trimmedUrl;
       updatePayload.etag = null;
@@ -589,7 +562,7 @@ export async function updateSubscriptionSettings(id: string, data: {
     }
   }
 
-  db.update(schema.subscriptions).set(updatePayload).where(eq(schema.subscriptions.id, id)).run();
+  await db.update(schema.subscriptions).set(updatePayload).where(eq(schema.subscriptions.id, id));
 
   // If URL changed and subscription is not disabled, automatically trigger refresh to parse new nodes
   if (isUrlChanged && (data.status || existing.status) !== 'disabled') {

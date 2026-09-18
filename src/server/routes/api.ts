@@ -45,10 +45,10 @@ api.get('/system/capabilities', (c) => {
 });
 
 // ================= Auth Routes (Public) =================
-api.get('/auth/status', (c) => {
-  const status = getAuthStatus();
+api.get('/auth/status', async (c) => {
+  const status = await getAuthStatus();
   const authHeader = c.req.header('Authorization');
-  const isAuthenticated = validateSessionToken(authHeader);
+  const isAuthenticated = await validateSessionToken(authHeader);
 
   return c.json({
     success: true,
@@ -62,7 +62,7 @@ api.get('/auth/status', (c) => {
 
 api.post('/auth/init', async (c) => {
   try {
-    const status = getAuthStatus();
+    const status = await getAuthStatus();
     if (status.initialized && !status.hasPasswordEnv) {
       return c.json({ success: false, message: '系统已初始化密码，请直接登录' }, 400);
     }
@@ -70,8 +70,8 @@ api.post('/auth/init', async (c) => {
     if (!body.password || body.password.length < 4) {
       return c.json({ success: false, message: '密码长度至少为 4 位' }, 400);
     }
-    initOrUpdatePassword(body.password);
-    const token = createSessionToken();
+    await initOrUpdatePassword(body.password);
+    const token = await createSessionToken();
     return c.json({ success: true, data: { token, message: '管理员密码初始化成功' } });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -96,12 +96,12 @@ api.post('/auth/login', async (c) => {
       return c.json({ success: false, message: '请输入密码' }, 400);
     }
 
-    const isValid = verifyPassword(password);
+    const isValid = await verifyPassword(password);
     if (!isValid) {
       return c.json({ success: false, message: '密码错误，请重试' }, 401);
     }
 
-    const token = createSessionToken();
+    const token = await createSessionToken();
     return c.json({ success: true, data: { token, message: '登录成功' } });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -117,11 +117,11 @@ api.post('/auth/logout', (c) => {
 api.post('/auth/change-password', async (c) => {
   try {
     const authHeader = c.req.header('Authorization');
-    if (!validateSessionToken(authHeader)) {
+    if (!(await validateSessionToken(authHeader))) {
       return c.json({ success: false, message: '未授权或登录已过期' }, 401);
     }
 
-    const authStatus = getAuthStatus();
+    const authStatus = await getAuthStatus();
     if (authStatus.hasPasswordEnv) {
       return c.json({
         success: false,
@@ -135,12 +135,12 @@ api.post('/auth/change-password', async (c) => {
       return c.json({ success: false, message: '新密码长度至少为 4 位' }, 400);
     }
 
-    if (!verifyPassword(oldPassword)) {
+    if (!(await verifyPassword(oldPassword))) {
       return c.json({ success: false, message: '原密码错误' }, 400);
     }
 
-    initOrUpdatePassword(newPassword);
-    const token = createSessionToken();
+    await initOrUpdatePassword(newPassword);
+    const token = await createSessionToken();
     return c.json({ success: true, data: { token }, message: '密码修改成功' });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -149,13 +149,11 @@ api.post('/auth/change-password', async (c) => {
 
 // ================= Auth Middleware for Protected API =================
 api.use('*', async (c, next) => {
-  // Allow /auth/* routes
-  if (c.req.path.startsWith('/auth')) {
+  if (c.req.path.startsWith('/auth') || c.req.path.startsWith('/system')) {
     return next();
   }
 
-  const authStatus = getAuthStatus();
-  // If not initialized yet, block access to all protected data APIs
+  const authStatus = await getAuthStatus();
   if (!authStatus.initialized) {
     return c.json({
       success: false,
@@ -165,7 +163,7 @@ api.use('*', async (c, next) => {
   }
 
   const authHeader = c.req.header('Authorization');
-  if (!validateSessionToken(authHeader)) {
+  if (!(await validateSessionToken(authHeader))) {
     return c.json({ success: false, message: '未授权，请先登录', code: 'UNAUTHORIZED' }, 401);
   }
 
@@ -175,14 +173,14 @@ api.use('*', async (c, next) => {
 // ================= Protected Routes =================
 
 // Dashboard Stats
-api.get('/stats', (c) => {
-  const stats = getDashboardStats();
+api.get('/stats', async (c) => {
+  const stats = await getDashboardStats();
   return c.json({ success: true, data: stats });
 });
 
 // Subscriptions CRUD
-api.get('/subscriptions', (c) => {
-  const subs = getAllSubscriptions();
+api.get('/subscriptions', async (c) => {
+  const subs = await getAllSubscriptions();
   return c.json({ success: true, data: subs });
 });
 
@@ -210,10 +208,10 @@ api.put('/subscriptions/:id', async (c) => {
   }
 });
 
-api.delete('/subscriptions/:id', (c) => {
+api.delete('/subscriptions/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    deleteSubscription(id);
+    await deleteSubscription(id);
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -232,8 +230,8 @@ api.post('/subscriptions/:id/refresh', async (c) => {
 
 api.post('/subscriptions/refresh-all', async (c) => {
   try {
-    const subs = getAllSubscriptions();
-    const tasks = subs.map(async (sub) => {
+    const subs = await getAllSubscriptions();
+    const tasks = subs.map(async (sub: any) => {
       try {
         const res = await refreshSubscription(sub.id, 'manual');
         return { id: sub.id, name: sub.name, success: true, nodeCount: res?.nodeCount || 0, data: res };
@@ -251,22 +249,22 @@ api.post('/subscriptions/refresh-all', async (c) => {
 });
 
 // Subscription Sync Logs
-api.get('/sync-logs', (c) => {
+api.get('/sync-logs', async (c) => {
   try {
     const subscriptionId = c.req.query('subscriptionId');
     const limitParam = c.req.query('limit');
     const limit = limitParam ? parseInt(limitParam, 10) : 100;
-    const logs = getSyncLogs(subscriptionId, limit);
+    const logs = await getSyncLogs(subscriptionId, limit);
     return c.json({ success: true, data: logs });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-api.delete('/sync-logs', (c) => {
+api.delete('/sync-logs', async (c) => {
   try {
     const subscriptionId = c.req.query('subscriptionId');
-    clearSyncLogs(subscriptionId);
+    await clearSyncLogs(subscriptionId);
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -274,7 +272,7 @@ api.delete('/sync-logs', (c) => {
 });
 
 // Nodes
-api.get('/nodes', (c) => {
+api.get('/nodes', async (c) => {
   const subscriptionId = c.req.query('subscriptionId');
   const page = c.req.query('page');
   const pageSize = c.req.query('pageSize');
@@ -284,7 +282,7 @@ api.get('/nodes', (c) => {
   const status = c.req.query('status');
 
   if (page !== undefined || pageSize !== undefined) {
-    const result = getPaginatedNodes({
+    const result = await getPaginatedNodes({
       subscriptionId,
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
@@ -296,14 +294,14 @@ api.get('/nodes', (c) => {
     return c.json({ success: true, data: result });
   }
 
-  const nodes = getAllNodes(subscriptionId);
+  const nodes = await getAllNodes(subscriptionId);
   return c.json({ success: true, data: nodes });
 });
 
-api.delete('/nodes/:id', (c) => {
+api.delete('/nodes/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    deleteNode(id);
+    await deleteNode(id);
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -347,8 +345,8 @@ api.post('/nodes/ping-all', async (c) => {
 });
 
 // Aggregates CRUD
-api.get('/aggregates', (c) => {
-  const aggs = getAllAggregates();
+api.get('/aggregates', async (c) => {
+  const aggs = await getAllAggregates();
   return c.json({ success: true, data: aggs });
 });
 
@@ -358,7 +356,7 @@ api.post('/aggregates', async (c) => {
     if (!body.name) {
       return c.json({ success: false, message: 'Name is required' }, 400);
     }
-    const agg = createAggregate(body);
+    const agg = await createAggregate(body);
     return c.json({ success: true, data: agg });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
@@ -369,47 +367,47 @@ api.put('/aggregates/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const updated = updateAggregate(id, body);
+    const updated = await updateAggregate(id, body);
     return c.json({ success: true, data: updated });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-api.delete('/aggregates/:id', (c) => {
+api.delete('/aggregates/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    deleteAggregate(id);
+    await deleteAggregate(id);
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-api.post('/aggregates/:id/rotate-token', (c) => {
+api.post('/aggregates/:id/rotate-token', async (c) => {
   try {
     const id = c.req.param('id');
-    const updated = rotateAggregateToken(id);
+    const updated = await rotateAggregateToken(id);
     return c.json({ success: true, data: updated });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-api.get('/aggregates/:id/logs', (c) => {
+api.get('/aggregates/:id/logs', async (c) => {
   try {
     const id = c.req.param('id');
-    const logs = getAggregateLogs(id);
+    const logs = await getAggregateLogs(id);
     return c.json({ success: true, data: logs });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
 });
 
-api.delete('/aggregates/:id/logs', (c) => {
+api.delete('/aggregates/:id/logs', async (c) => {
   try {
     const id = c.req.param('id');
-    clearAggregateLogs(id);
+    await clearAggregateLogs(id);
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);

@@ -1,11 +1,10 @@
-import { db, schema } from '../db/index.js';
 import { DashboardStats } from '../../core/types/index.js';
 import { getAllNodes } from './nodeService.js';
 import { getAllSubscriptions } from './subscriptionService.js';
 
-export function getDashboardStats(): DashboardStats {
-  const subscriptions = getAllSubscriptions();
-  const nodes = getAllNodes();
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const subscriptions = await getAllSubscriptions();
+  const nodes = await getAllNodes();
 
   let onlineNodes = 0;
   let slowNodes = 0;

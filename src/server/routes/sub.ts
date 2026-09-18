@@ -29,7 +29,7 @@ function detectTargetFormat(ua: string): string {
   return 'clash';
 }
 
-subRouter.get('/:token', (c) => {
+subRouter.get('/:token', async (c) => {
   const token = c.req.param('token');
   const targetParam = c.req.query('target') || c.req.query('format');
   const ua = c.req.header('User-Agent') || '';
@@ -41,7 +41,7 @@ subRouter.get('/:token', (c) => {
     return c.text(`Too Many Requests. Please retry in ${rateLimit.retryAfterSec} seconds.`, 429);
   }
 
-  const group = getAggregateByToken(token);
+  const group = await getAggregateByToken(token);
   if (!group || !group.enabled) {
     return c.text('Subscription Not Found or Disabled', 404);
   }
@@ -49,11 +49,11 @@ subRouter.get('/:token', (c) => {
   const target = targetParam || detectTargetFormat(ua) || group.targetFormat || 'clash';
 
   try {
-    const { content, contentType, filename, nodeCount } = generateAggregateSubscription(token, target);
+    const { content, contentType, filename, nodeCount } = await generateAggregateSubscription(token, target);
 
     // Record access audit log
     try {
-      recordAggregateAccess({
+      await recordAggregateAccess({
         aggregateId: group.id,
         aggregateToken: group.token,
         ip: clientIp,
@@ -66,13 +66,18 @@ subRouter.get('/:token', (c) => {
     }
 
     // Calculate aggregated traffic & expiration for userinfo header
-    const subs = getAllSubscriptions().filter((s) => s.status !== 'disabled');
+    const allSubs = await getAllSubscriptions();
+    const subs = allSubs.filter((s: any) => s.status !== 'disabled');
     let totalUpload = 0;
     let totalDownload = 0;
     let totalQuota = 0;
     let minExpire = 0;
 
-    const activeSubIds = new Set(group.subscriptionIds.length > 0 ? group.subscriptionIds.filter((id) => subs.some((s) => s.id === id)) : subs.map((s) => s.id));
+    const activeSubIds = new Set(
+      group.subscriptionIds.length > 0
+        ? group.subscriptionIds.filter((id: string) => subs.some((s: any) => s.id === id))
+        : subs.map((s: any) => s.id)
+    );
 
     for (const sub of subs) {
       if (!activeSubIds.has(sub.id)) continue;

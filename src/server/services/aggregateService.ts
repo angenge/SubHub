@@ -1,6 +1,6 @@
 import { eq, desc } from 'drizzle-orm';
-import { db, sqlite, schema } from '../db/index.js';
-import { AggregateGroup, ProxyNode, AccessLog } from '../../core/types/index.js';
+import { db, schema } from '../db/index.js';
+import { AggregateGroup, AccessLog } from '../../core/types/index.js';
 import { getAllNodes } from './nodeService.js';
 import { getAllSubscriptions } from './subscriptionService.js';
 import { processAggregateNodes } from '../../core/engine/index.js';
@@ -39,26 +39,29 @@ export function parseDbAggregate(raw: any): AggregateGroup {
   };
 }
 
-export function getAllAggregates(): AggregateGroup[] {
-  return db.select().from(schema.aggregates).all().map(parseDbAggregate);
+export async function getAllAggregates(): Promise<AggregateGroup[]> {
+  const rows = await db.select().from(schema.aggregates);
+  return rows.map(parseDbAggregate);
 }
 
-export function getAggregateById(id: string): AggregateGroup | null {
-  const row = db.select().from(schema.aggregates).where(eq(schema.aggregates.id, id)).get();
+export async function getAggregateById(id: string): Promise<AggregateGroup | null> {
+  const rows = await db.select().from(schema.aggregates).where(eq(schema.aggregates.id, id));
+  const row = rows[0];
   return row ? parseDbAggregate(row) : null;
 }
 
-export function getAggregateByToken(token: string): AggregateGroup | null {
-  const row = db.select().from(schema.aggregates).where(eq(schema.aggregates.token, token)).get();
+export async function getAggregateByToken(token: string): Promise<AggregateGroup | null> {
+  const rows = await db.select().from(schema.aggregates).where(eq(schema.aggregates.token, token));
+  const row = rows[0];
   return row ? parseDbAggregate(row) : null;
 }
 
-export function createAggregate(data: Partial<AggregateGroup> & { name: string }) {
+export async function createAggregate(data: Partial<AggregateGroup> & { name: string }): Promise<AggregateGroup | null> {
   const id = `agg_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const token = crypto.randomBytes(16).toString('hex');
   const now = new Date().toISOString();
 
-  db.insert(schema.aggregates).values({
+  await db.insert(schema.aggregates).values({
     id,
     name: data.name,
     token, // Always generate a secure, random cryptographic token on creation
@@ -80,12 +83,12 @@ export function createAggregate(data: Partial<AggregateGroup> & { name: string }
     lastAccessedIp: null,
     createdAt: now,
     updatedAt: now,
-  }).run();
+  });
 
   return getAggregateById(id);
 }
 
-export function updateAggregate(id: string, data: Partial<AggregateGroup>) {
+export async function updateAggregate(id: string, data: Partial<AggregateGroup>): Promise<AggregateGroup | null> {
   const now = new Date().toISOString();
   const updateData: any = { updatedAt: now };
 
@@ -105,23 +108,23 @@ export function updateAggregate(id: string, data: Partial<AggregateGroup>) {
   if (data.customRuleConfig !== undefined) updateData.customRuleConfig = data.customRuleConfig;
   if (data.enabled !== undefined) updateData.enabled = data.enabled;
 
-  db.update(schema.aggregates).set(updateData).where(eq(schema.aggregates.id, id)).run();
+  await db.update(schema.aggregates).set(updateData).where(eq(schema.aggregates.id, id));
 
   return getAggregateById(id);
 }
 
-export function deleteAggregate(id: string) {
-  db.delete(schema.accessLogs).where(eq(schema.accessLogs.aggregateId, id)).run();
-  db.delete(schema.aggregates).where(eq(schema.aggregates.id, id)).run();
+export async function deleteAggregate(id: string) {
+  await db.delete(schema.accessLogs).where(eq(schema.accessLogs.aggregateId, id));
+  await db.delete(schema.aggregates).where(eq(schema.aggregates.id, id));
   return { success: true };
 }
 
-export function rotateAggregateToken(id: string) {
+export async function rotateAggregateToken(id: string) {
   const newToken = crypto.randomBytes(16).toString('hex');
   return updateAggregate(id, { token: newToken });
 }
 
-export function recordAggregateAccess(data: {
+export async function recordAggregateAccess(data: {
   aggregateId: string;
   aggregateToken: string;
   ip: string;
@@ -133,7 +136,7 @@ export function recordAggregateAccess(data: {
   const now = new Date().toISOString();
 
   // 1. Insert access log
-  db.insert(schema.accessLogs).values({
+  await db.insert(schema.accessLogs).values({
     id,
     aggregateId: data.aggregateId,
     aggregateToken: data.aggregateToken,
@@ -142,39 +145,28 @@ export function recordAggregateAccess(data: {
     targetFormat: data.targetFormat || null,
     nodeCount: data.nodeCount,
     accessedAt: now,
-  }).run();
+  });
 
   // 2. Update counter & last access info in aggregates table
-  const group = getAggregateById(data.aggregateId);
+  const group = await getAggregateById(data.aggregateId);
   if (group) {
     const nextCount = (group.accessCount || 0) + 1;
-    db.update(schema.aggregates).set({
+    await db.update(schema.aggregates).set({
       accessCount: nextCount,
       lastAccessedAt: now,
       lastAccessedIp: data.ip,
-    }).where(eq(schema.aggregates.id, data.aggregateId)).run();
+    }).where(eq(schema.aggregates.id, data.aggregateId));
   }
-
-  // 3. Auto rotate: keep latest 2000 access logs to prevent DB growth
-  try {
-    sqlite.prepare(`
-      DELETE FROM access_logs
-      WHERE id NOT IN (
-        SELECT id FROM access_logs ORDER BY accessed_at DESC LIMIT 2000
-      )
-    `).run();
-  } catch {}
 }
 
-export function getAggregateLogs(aggregateId: string, limit = 100): AccessLog[] {
-  const rows = db.select()
+export async function getAggregateLogs(aggregateId: string, limit = 100): Promise<AccessLog[]> {
+  const rows = await db.select()
     .from(schema.accessLogs)
     .where(eq(schema.accessLogs.aggregateId, aggregateId))
     .orderBy(desc(schema.accessLogs.accessedAt))
-    .limit(limit)
-    .all();
+    .limit(limit);
 
-  return rows.map((r) => ({
+  return rows.map((r: any) => ({
     id: r.id,
     aggregateId: r.aggregateId,
     aggregateToken: r.aggregateToken,
@@ -186,26 +178,28 @@ export function getAggregateLogs(aggregateId: string, limit = 100): AccessLog[] 
   }));
 }
 
-export function clearAggregateLogs(aggregateId: string) {
-  db.delete(schema.accessLogs).where(eq(schema.accessLogs.aggregateId, aggregateId)).run();
+export async function clearAggregateLogs(aggregateId: string) {
+  await db.delete(schema.accessLogs).where(eq(schema.accessLogs.aggregateId, aggregateId));
   return { success: true };
 }
 
-export function generateAggregateSubscription(
+export async function generateAggregateSubscription(
   token: string,
   targetFormatOverride?: string
-): { content: string; contentType: string; filename: string; nodeCount: number; group: AggregateGroup } {
-  const group = getAggregateByToken(token);
+): Promise<{ content: string; contentType: string; filename: string; nodeCount: number; group: AggregateGroup }> {
+  const group = await getAggregateByToken(token);
   if (!group || !group.enabled) {
     throw new Error('Aggregate not found or disabled');
   }
 
   // Get active (non-disabled) subscription IDs
-  const activeSubs = getAllSubscriptions().filter((s) => s.status !== 'disabled');
-  const activeSubIdSet = new Set(activeSubs.map((s) => s.id));
+  const allSubs = await getAllSubscriptions();
+  const activeSubs = allSubs.filter((s: any) => s.status !== 'disabled');
+  const activeSubIdSet = new Set(activeSubs.map((s: any) => s.id));
 
   // Only consider nodes belonging to active subscriptions
-  const allNodes = getAllNodes().filter((n) => !n.subscriptionId || activeSubIdSet.has(n.subscriptionId));
+  const nodes = await getAllNodes();
+  const allNodes = nodes.filter((n) => !n.subscriptionId || activeSubIdSet.has(n.subscriptionId));
   const filteredNodes = processAggregateNodes(allNodes, group);
 
   const format = (targetFormatOverride || group.targetFormat || 'clash').toLowerCase();

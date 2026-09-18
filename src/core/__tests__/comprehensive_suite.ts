@@ -22,8 +22,14 @@ import {
   revokeSessionToken,
   getAuthStatus,
 } from '../../server/services/authService.js';
+import { initNodeDatabase } from '../../server/db/node.js';
+import { setDefaultDb } from '../../server/db/index.js';
 import net from 'net';
 import path from 'path';
+
+// Initialize test database
+const { db: testDb } = initNodeDatabase();
+setDefaultDb(testDb);
 
 interface TestResult {
   name: string;
@@ -600,21 +606,21 @@ proxies:
     }
   });
 
-  runTest('Security - Auth & Password', '密码哈希随机 Salt 与 Session Token 撤销生命周期', () => {
-    initOrUpdatePassword('MySuperSecureAdminPass123!');
-    const isValid = verifyPassword('MySuperSecureAdminPass123!');
+  await runAsyncTest('Security - Auth & Password', '密码哈希随机 Salt 与 Session Token 撤销生命周期', async () => {
+    await initOrUpdatePassword('MySuperSecureAdminPass123!');
+    const isValid = await verifyPassword('MySuperSecureAdminPass123!');
     if (!isValid) throw new Error('正确密码验证失败');
 
-    const isWrongValid = verifyPassword('WrongPassword123');
+    const isWrongValid = await verifyPassword('WrongPassword123');
     if (isWrongValid) throw new Error('错误密码未被拦截');
 
-    const token = createSessionToken();
-    if (!validateSessionToken(`Bearer ${token}`)) {
+    const token = await createSessionToken();
+    if (!(await validateSessionToken(`Bearer ${token}`))) {
       throw new Error('新创建的 Session Token 验证未通过');
     }
 
     revokeSessionToken(`Bearer ${token}`);
-    if (validateSessionToken(`Bearer ${token}`)) {
+    if (await validateSessionToken(`Bearer ${token}`)) {
       throw new Error('已销毁的 Session Token 仍然有效');
     }
   });

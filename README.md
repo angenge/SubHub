@@ -103,6 +103,22 @@ npm run dev
 npm run dev:server
 ```
 
+### 方式三：Cloudflare 全球边缘部署 (0 成本 Serverless)
+
+SubHub 完美适配 Cloudflare Workers + D1 + Static Assets 边缘全栈架构：
+
+```bash
+# 1. 创建 D1 数据库并初始化表结构
+npx wrangler d1 create subhub-db
+npx wrangler d1 execute subhub-db --remote --file=./migrations/0000_init_d1.sql
+
+# 2. 编译前端与后端代码
+npm run build
+
+# 3. 部署到 Cloudflare
+npx wrangler deploy
+```
+
 ---
 
 ## ⚙️ 环境变量

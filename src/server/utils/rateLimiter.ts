@@ -5,10 +5,14 @@ interface RateLimitRecord {
 }
 
 const rateLimitStores = new Map<string, Map<string, RateLimitRecord>>();
+let lastCleanupTime = Date.now();
 
-// Periodic cleanup of stale rate limit entries every 5 minutes
-setInterval(() => {
+function lazyCleanupStaleEntries() {
   const now = Date.now();
+  // Cleanup at most once every 2 minutes when requests arrive
+  if (now - lastCleanupTime < 2 * 60 * 1000) return;
+  lastCleanupTime = now;
+
   for (const [, store] of rateLimitStores) {
     for (const [key, record] of store.entries()) {
       if (now > record.resetAt) {
@@ -16,7 +20,7 @@ setInterval(() => {
       }
     }
   }
-}, 5 * 60 * 1000).unref();
+}
 
 export function getClientIpFromContext(c: any): string {
   // If TRUST_PROXY is enabled or running behind Cloudflare / standard reverse proxy
@@ -53,6 +57,8 @@ export function checkRateLimit(
   key: string,
   options: { maxRequests: number; windowMs: number }
 ): { allowed: boolean; remaining: number; retryAfterSec: number } {
+  lazyCleanupStaleEntries();
+
   let store = rateLimitStores.get(bucket);
   if (!store) {
     store = new Map();
