@@ -1,4 +1,4 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { AggregateGroup, AccessLog } from '../../core/types/index.js';
 import { getAllNodes } from './nodeService.js';
@@ -172,16 +172,12 @@ export async function recordAggregateAccess(data: {
     accessedAt: now,
   });
 
-  // 2. Update counter & last access info in aggregates table
-  const group = await getAggregateById(data.aggregateId);
-  if (group) {
-    const nextCount = (group.accessCount || 0) + 1;
-    await db.update(schema.aggregates).set({
-      accessCount: nextCount,
-      lastAccessedAt: now,
-      lastAccessedIp: data.ip,
-    }).where(eq(schema.aggregates.id, data.aggregateId));
-  }
+  // 2. Atomic increment in aggregates table to guarantee consistency during concurrent bursts
+  await db.update(schema.aggregates).set({
+    accessCount: sql`COALESCE(${schema.aggregates.accessCount}, 0) + 1`,
+    lastAccessedAt: now,
+    lastAccessedIp: data.ip,
+  }).where(eq(schema.aggregates.id, data.aggregateId));
 }
 
 export async function getAggregateLogs(aggregateId: string, limit = 100): Promise<AccessLog[]> {
@@ -223,8 +219,7 @@ export async function generateAggregateSubscription(
   const activeSubIdSet = new Set(activeSubs.map((s: any) => s.id));
 
   // Only consider nodes belonging to active subscriptions
-  const nodes = await getAllNodes();
-  const allNodes = nodes.filter((n) => !n.subscriptionId || activeSubIdSet.has(n.subscriptionId));
+  const allNodes = await getAllNodes(undefined, false);
   const filteredNodes = processAggregateNodes(allNodes, group);
 
   const format = (targetFormatOverride || group.targetFormat || 'clash').toLowerCase();
