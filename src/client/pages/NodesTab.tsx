@@ -63,21 +63,35 @@ export const NodesTab: React.FC<NodesTabProps> = ({
   // Detail Modal state
   const [selectedNodeForDetail, setSelectedNodeForDetail] = useState<ProxyNode | null>(null);
 
-  // Extract all unique countries in the nodes
+  // Filter out disabled subscriptions from options & nodes filter
+  const activeSubscriptions = useMemo(() => {
+    return subscriptions.filter((s) => s.status !== 'disabled');
+  }, [subscriptions]);
+
+  const activeSubIdSet = useMemo(() => {
+    return new Set(activeSubscriptions.map((s) => s.id));
+  }, [activeSubscriptions]);
+
+  // Active nodes (belong to enabled subscriptions)
+  const activeNodes = useMemo(() => {
+    return nodes.filter((n) => !n.subscriptionId || activeSubIdSet.has(n.subscriptionId));
+  }, [nodes, activeSubIdSet]);
+
+  // Extract all unique countries in the active nodes
   const availableCountries = useMemo(() => {
     const map = new Map<string, string>();
-    for (const n of nodes) {
+    for (const n of activeNodes) {
       if (n.country) {
         map.set(n.country, n.countryCode || 'OTHER');
       }
     }
     return Array.from(map.entries()).map(([country, code]) => ({ country, code }));
-  }, [nodes]);
+  }, [activeNodes]);
 
   // Filtered nodes
   const filteredNodes = useMemo(() => {
     const query = debouncedSearch.trim().toLowerCase();
-    return nodes.filter((n) => {
+    return activeNodes.filter((n) => {
       if (selectedSubscriptionId && n.subscriptionId !== selectedSubscriptionId) return false;
       if (selectedProtocol !== 'all' && n.type.toLowerCase() !== selectedProtocol.toLowerCase()) return false;
       if (selectedCountry !== 'all' && n.country !== selectedCountry) return false;
@@ -94,7 +108,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       }
       return true;
     });
-  }, [nodes, selectedSubscriptionId, selectedProtocol, selectedCountry, selectedStatus, debouncedSearch]);
+  }, [activeNodes, selectedSubscriptionId, selectedProtocol, selectedCountry, selectedStatus, debouncedSearch]);
 
   // Reset page when filter changes
   React.useEffect(() => {
@@ -136,7 +150,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
             节点工作台
           </h2>
           <p className="text-xs text-slate-400 mt-0.5 sm:mt-1">
-            实时监测所有代理节点连通性与 TCP 握手延迟，支持查看复制原生配置与单节点调试
+            实时监测所有可用代理节点连通性与 TCP 握手延迟，支持查看复制原生配置与单节点调试
           </p>
         </div>
 
@@ -165,7 +179,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           {enableTcpPing && (
             <button
               onClick={handlePingAll}
-              disabled={isPingingAll || nodes.length === 0}
+              disabled={isPingingAll || activeNodes.length === 0}
               className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 transition active:scale-95 disabled:opacity-50"
             >
               {isPingingAll ? (
@@ -206,8 +220,8 @@ export const NodesTab: React.FC<NodesTabProps> = ({
               onChange={(e) => onSelectSubscription(e.target.value === 'all' ? undefined : e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none focus:border-emerald-500"
             >
-              <option value="all">所有订阅源 ({subscriptions.length})</option>
-              {subscriptions.map((s) => (
+              <option value="all">全部可用订阅 ({activeSubscriptions.length})</option>
+              {activeSubscriptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name} ({s.nodeCount})
                 </option>
@@ -255,7 +269,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
             状态:
           </span>
           {[
-            { id: 'all', label: `全部 (${nodes.length})` },
+            { id: 'all', label: `全部 (${activeNodes.length})` },
             { id: 'online', label: '🟢 在线' },
             { id: 'slow', label: '🟡 缓慢' },
             { id: 'timeout', label: '🔴 超时' },
@@ -282,7 +296,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       {/* Content: Table or Grid */}
       {filteredNodes.length === 0 ? (
         <div className="text-center py-12 sm:py-16 rounded-2xl bg-slate-900/50 border border-slate-800 border-dashed text-slate-500 text-xs">
-          未找到符合条件的节点
+          未找到符合条件的可用节点
         </div>
       ) : viewMode === 'table' ? (
         /* TABLE VIEW (with horizontal scroll on small devices) */

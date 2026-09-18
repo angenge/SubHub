@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Shuffle, Plus, Trash2, Loader2, Sparkles, Filter } from 'lucide-react';
+import { X, Shuffle, Plus, Trash2, Loader2, Sparkles } from 'lucide-react';
 import { AggregateGroup, Subscription, RenameRule, ProxyType } from '../../core/types/index.js';
 
 interface AggregateModalProps {
@@ -40,6 +40,9 @@ export const AggregateModal: React.FC<AggregateModalProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Filter out disabled subscriptions from selectable options
+  const activeSubscriptions = subscriptions.filter((s) => s.status !== 'disabled');
 
   // Sync state whenever modal is opened or initialData changes
   React.useEffect(() => {
@@ -202,27 +205,33 @@ export const AggregateModal: React.FC<AggregateModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-slate-300">选择包含的订阅源</label>
-              <span className="text-[10px] sm:text-xs text-slate-500">（默认不勾选代表聚合全部订阅）</span>
+              <span className="text-[10px] sm:text-xs text-slate-500">（默认不勾选代表聚合全部可用订阅）</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 rounded-xl bg-slate-950 border border-slate-800/80">
-              {subscriptions.map((sub) => {
-                const isSelected = selectedSubIds.includes(sub.id);
-                return (
-                  <div
-                    key={sub.id}
-                    onClick={() => handleToggleSub(sub.id)}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer border transition active:scale-[0.98] ${
-                      isSelected
-                        ? 'bg-indigo-950/60 text-indigo-200 border-indigo-500/40 shadow-sm'
-                        : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="truncate mr-2 font-medium">{sub.name}</span>
-                    <span className="text-[10px] text-slate-500 shrink-0">({sub.nodeCount} 节点)</span>
-                  </div>
-                );
-              })}
-            </div>
+            {activeSubscriptions.length === 0 ? (
+              <div className="p-3 text-center rounded-xl bg-slate-950/40 border border-slate-800/80 text-[11px] text-slate-500">
+                暂无可用的启用状态订阅源
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 rounded-xl bg-slate-950 border border-slate-800/80">
+                {activeSubscriptions.map((sub) => {
+                  const isSelected = selectedSubIds.includes(sub.id);
+                  return (
+                    <div
+                      key={sub.id}
+                      onClick={() => handleToggleSub(sub.id)}
+                      className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs cursor-pointer border transition active:scale-[0.98] ${
+                        isSelected
+                          ? 'bg-indigo-950/60 text-indigo-200 border-indigo-500/40 shadow-sm'
+                          : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="truncate mr-2 font-medium">{sub.name}</span>
+                      <span className="text-[10px] text-slate-500 shrink-0">({sub.nodeCount} 节点)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Protocols multi-select */}

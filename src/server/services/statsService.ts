@@ -3,8 +3,11 @@ import { getAllNodes } from './nodeService.js';
 import { getAllSubscriptions } from './subscriptionService.js';
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const subscriptions = await getAllSubscriptions();
-  const nodes = await getAllNodes();
+  const allSubscriptions = await getAllSubscriptions();
+  // Active (non-disabled) subscriptions
+  const activeSubscriptions = allSubscriptions.filter((s: any) => s.status !== 'disabled');
+  // Nodes of active subscriptions
+  const nodes = await getAllNodes(undefined, false);
 
   let onlineNodes = 0;
   let slowNodes = 0;
@@ -16,7 +19,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let totalTrafficUsed = 0;
   let totalTrafficQuota = 0;
 
-  for (const sub of subscriptions) {
+  for (const sub of activeSubscriptions) {
     if (sub.upload || sub.download) {
       totalTrafficUsed += (sub.upload || 0) + (sub.download || 0);
     }
@@ -49,7 +52,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .sort((a, b) => b.count - a.count);
 
   return {
-    totalSubscriptions: subscriptions.length,
+    totalSubscriptions: activeSubscriptions.length,
     totalNodes: nodes.length,
     onlineNodes,
     slowNodes,

@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { ProxyNode, PingResult } from '../../core/types/index.js';
 import { batchPingNodes, pingNode } from '../../core/ping/index.js';
+import { getAllSubscriptions } from './subscriptionService.js';
 
 export function parseDbNode(raw: any): ProxyNode {
   let extra: any = {};
@@ -44,14 +45,28 @@ export function parseDbNode(raw: any): ProxyNode {
   };
 }
 
-export async function getAllNodes(subscriptionId?: string): Promise<ProxyNode[]> {
-  let query = db.select().from(schema.nodes);
-  if (subscriptionId) {
-    const rows = await query.where(eq(schema.nodes.subscriptionId, subscriptionId));
-    return rows.map(parseDbNode);
+export async function getAllNodes(subscriptionId?: string, includeDisabled = false): Promise<ProxyNode[]> {
+  // If not including disabled, filter out nodes belonging to disabled subscriptions
+  let activeSubIdSet: Set<string> | null = null;
+  if (!includeDisabled) {
+    const allSubs = await getAllSubscriptions();
+    const activeSubs = allSubs.filter((s: any) => s.status !== 'disabled');
+    activeSubIdSet = new Set(activeSubs.map((s: any) => s.id));
   }
-  const rows = await query;
-  return rows.map(parseDbNode);
+
+  let query = db.select().from(schema.nodes);
+  let rows: any[] = [];
+  if (subscriptionId) {
+    rows = await query.where(eq(schema.nodes.subscriptionId, subscriptionId));
+  } else {
+    rows = await query;
+  }
+
+  const nodes = rows.map(parseDbNode);
+  if (activeSubIdSet !== null) {
+    return nodes.filter((n) => !n.subscriptionId || activeSubIdSet.has(n.subscriptionId));
+  }
+  return nodes;
 }
 
 export interface NodeFilterParams {
@@ -62,6 +77,7 @@ export interface NodeFilterParams {
   status?: string;
   page?: number;
   pageSize?: number;
+  includeDisabled?: boolean;
 }
 
 export async function getPaginatedNodes(params: NodeFilterParams): Promise<{
@@ -74,7 +90,7 @@ export async function getPaginatedNodes(params: NodeFilterParams): Promise<{
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = Math.max(1, Math.min(Number(params.pageSize) || 50, 500));
 
-  let nodes = await getAllNodes(params.subscriptionId);
+  let nodes = await getAllNodes(params.subscriptionId, params.includeDisabled ?? false);
 
   if (params.protocol && params.protocol !== 'all') {
     const proto = params.protocol.toLowerCase();
@@ -145,7 +161,7 @@ export async function pingAllNodes(
   subscriptionId?: string,
   onProgress?: (progress: { current: number; total: number; result: PingResult }) => void
 ): Promise<PingResult[]> {
-  const nodes = await getAllNodes(subscriptionId);
+  const nodes = await getAllNodes(subscriptionId, false);
   const pendingUpdates: PingResult[] = [];
   let lastFlush = Date.now();
 
