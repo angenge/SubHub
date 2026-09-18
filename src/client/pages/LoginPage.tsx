@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layers, Lock, Shield, KeyRound, ArrowRight, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Layers, Lock, Shield, KeyRound, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import { initPassword, login } from '../api/index.js';
 
 interface LoginPageProps {
@@ -51,15 +51,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ isInitialized, onLoginSucc
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center p-4 selection:bg-sky-500 selection:text-white">
-      <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-8">
+    <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center p-3 sm:p-4 selection:bg-sky-500 selection:text-white">
+      <div className="relative w-full max-w-md rounded-2xl sm:rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-6 sm:p-8 my-auto">
         {/* Brand */}
-        <div className="text-center space-y-3 mb-8">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-sky-500/20 ring-1 ring-white/20">
-            <Layers className="w-7 h-7 text-white" />
+        <div className="text-center space-y-2.5 sm:space-y-3 mb-6 sm:mb-8">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-sky-500/20 ring-1 ring-white/20">
+            <Layers className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">SubHub 控制台</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">SubHub 控制台</h1>
             <p className="text-xs text-slate-400 mt-1">
               {isInitialized
                 ? '请输入管理员密码以管理订阅与聚合'
@@ -69,13 +69,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ isInitialized, onLoginSucc
         </div>
 
         {error && (
-          <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+          <div className="mb-4 sm:mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2 break-all">
             <Shield className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
               <span>{isInitialized ? '管理员密码' : '设置初始管理员密码'}</span>
@@ -89,7 +89,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ isInitialized, onLoginSucc
                 placeholder={isInitialized ? '请输入密码...' : '请输入至少4位字符的新密码'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
+                className="w-full pl-10 pr-10 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
               />
               <button
                 type="button"
@@ -115,7 +115,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ isInitialized, onLoginSucc
                   placeholder="请再次输入新密码"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
+                  className="w-full pl-10 pr-10 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
                 />
                 <button
                   type="button"
@@ -145,7 +145,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ isInitialized, onLoginSucc
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-800/80 text-center text-xs text-slate-500">
+        <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-800/80 text-center text-[11px] sm:text-xs text-slate-500">
           SubHub &copy; 2026 - 私有 VPN 订阅聚合与节点管理系统
         </div>
       </div>

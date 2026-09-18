@@ -456,8 +456,8 @@ export const App: React.FC = () => {
         onLogoutClick={handleLogout}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Container (Extra bottom padding on mobile for bottom navigation bar) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 md:pb-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-3">
             <div className="w-8 h-8 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
@@ -539,7 +539,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/60 py-6 text-center text-xs text-slate-500">
+      <footer className="hidden md:block border-t border-slate-800/60 py-6 text-center text-xs text-slate-500">
         <p>SubHub &copy; 2026 - 智能 VPN 订阅管理聚合与探针平台</p>
       </footer>
 

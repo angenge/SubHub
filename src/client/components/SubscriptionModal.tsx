@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Globe, Radio, Shield, Loader2 } from 'lucide-react';
+import { X, Radio, Loader2 } from 'lucide-react';
 import { Subscription } from '../../core/types/index.js';
 
 interface SubscriptionModalProps {
@@ -73,34 +73,34 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+      <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-6 text-slate-100 my-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20">
+        <div className="flex items-center gap-2.5 mb-4 sm:mb-5 pr-8">
+          <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400 border border-sky-500/20 shrink-0">
             <Radio className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">
+            <h3 className="text-base sm:text-lg font-semibold text-white">
               {initialData ? '编辑订阅源' : '添加订阅源'}
             </h3>
-            <p className="text-xs text-slate-400">支持 Clash YAML、V2Ray Base64、Sing-box JSON 链接</p>
+            <p className="text-[11px] sm:text-xs text-slate-400">支持 Clash YAML、V2Ray Base64、Sing-box JSON 链接</p>
           </div>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs break-all">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">
               订阅名称 <span className="text-rose-400">*</span>
@@ -111,7 +111,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               placeholder="例如: 某某机场-VIP"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
+              className="w-full px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
             />
           </div>
 
@@ -125,7 +125,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               placeholder="https://airport.com/api/v1/client/subscribe?token=..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition font-mono"
+              className="w-full px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-xs sm:text-sm text-slate-100 placeholder:text-slate-600 outline-none transition font-mono"
             />
           </div>
 
@@ -138,17 +138,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               placeholder="ClashMeta/v1.18.0"
               value={customUserAgent}
               onChange={(e) => setCustomUserAgent(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
+              className="w-full px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-xs sm:text-sm text-slate-100 placeholder:text-slate-600 outline-none transition"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">自动更新周期</label>
               <select
                 value={updateInterval}
                 onChange={(e) => setUpdateInterval(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 text-sm text-slate-100 outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 text-xs sm:text-sm text-slate-100 outline-none"
               >
                 <option value={60}>每 1 小时</option>
                 <option value={180}>每 3 小时</option>
@@ -163,7 +163,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               <select
                 value={status === 'disabled' ? 'disabled' : 'active'}
                 onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 text-sm text-slate-100 outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 text-xs sm:text-sm text-slate-100 outline-none"
               >
                 <option value="active">正常启用</option>
                 <option value="disabled">暂时禁用 (不参与聚合)</option>
@@ -183,21 +183,21 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2.5 sm:gap-3 pt-3 sm:pt-4 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/30 transition disabled:opacity-50"
+              className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-lg shadow-sky-600/30 transition active:scale-95 disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {initialData ? '保存修改' : '拉取并添加'}
+              <span>{initialData ? '保存修改' : '拉取并添加'}</span>
             </button>
           </div>
         </form>
