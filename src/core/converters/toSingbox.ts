@@ -210,7 +210,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Route rules using rule_set instead of deprecated inline geosite/geoip
+  // Route rules using modern actions and rule_sets
   const routeRules: any[] = [
     {
       action: 'sniff',
@@ -237,14 +237,11 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Modern DNS rules using rule_set
+  // Modern DNS rules: use action: route and remove legacy outbound field (1.12+ compliant)
   const dnsRules: any[] = [
     {
-      outbound: 'any',
-      server: 'local-dns',
-    },
-    {
       rule_set: 'geosite-cn',
+      action: 'route',
       server: 'local-dns',
     },
   ];
@@ -273,11 +270,13 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
         },
       ],
       rules: dnsRules,
+      final: 'cf-dns',
       strategy: 'ipv4_only',
     },
     inbounds,
     outbounds,
     route: {
+      default_domain_resolver: 'local-dns',
       rule_set: ruleSets,
       rules: routeRules,
       final: '🚀 节点选择',
