@@ -128,6 +128,15 @@ export async function rotateAgentSecret(): Promise<{ secret: string }> {
   return safeFetchJson<{ secret: string }>(`${API_BASE}/agent/rotate-secret`, { method: 'POST' });
 }
 
+// ================= Sing-box Gateway Status Dashboard API =================
+export async function getClashSecret(): Promise<{ secret: string }> {
+  return safeFetchJson<{ secret: string }>(`${API_BASE}/gateway/clash-secret`);
+}
+
+export async function rotateClashSecret(): Promise<{ secret: string }> {
+  return safeFetchJson<{ secret: string }>(`${API_BASE}/gateway/clash-secret/rotate`, { method: 'POST' });
+}
+
 // ================= Business API =================
 
 export async function getStats(): Promise<DashboardStats> {

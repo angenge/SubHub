@@ -23,6 +23,8 @@ import {
   rotateAggregateToken,
   getAggregateLogs,
   clearAggregateLogs,
+  getOrInitClashSecret,
+  rotateClashSecret,
 } from '../services/aggregateService.js';
 import { getDashboardStats } from '../services/statsService.js';
 import { getSystemCapabilities } from '../config/capabilities.js';
@@ -451,6 +453,25 @@ api.delete('/aggregates/:id/logs', async (c) => {
     const id = c.req.param('id');
     await clearAggregateLogs(id);
     return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+// ================= Sing-box Clash API Dashboard Secret (Protected by Admin Auth) =================
+api.get('/gateway/clash-secret', async (c) => {
+  try {
+    const secret = await getOrInitClashSecret();
+    return c.json({ success: true, data: { secret } });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+api.post('/gateway/clash-secret/rotate', async (c) => {
+  try {
+    const secret = await rotateClashSecret();
+    return c.json({ success: true, data: { secret }, message: 'Clash API 密钥已成功轮换重置' });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }

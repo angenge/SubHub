@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, Copy, ShieldCheck, Smartphone, Terminal, Server } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { AggregateGroup } from '../../core/types/index.js';
+import { getClashSecret } from '../../client/api/index.js';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -13,6 +14,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [activeQrFormat, setActiveQrFormat] = useState<string>('clash');
   const [activeTab, setActiveTab] = useState<'links' | 'server'>('links');
+  const [clashSecret, setClashSecret] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'server') {
+      getClashSecret()
+        .then((res) => setClashSecret(res.secret))
+        .catch(() => setClashSecret(null));
+    }
+  }, [isOpen, activeTab]);
 
   if (!isOpen || !aggregate) return null;
 
@@ -35,6 +45,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
   --name sing-box-proxy \\
   --restart unless-stopped \\
   -p 1080:1080 \\
+  -p 9090:9090 \\
   -e SUBHUB_URL="${singboxSubUrl}" \\
   -e UPDATE_INTERVAL=7200 \\
   --entrypoint sh \\
@@ -219,6 +230,38 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
                 {dockerServerCmd}
               </pre>
             </div>
+
+            {clashSecret && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
+                  <span className="flex items-center gap-1.5 font-mono">
+                    <span>📊 Sing-box 状态可视化仪表盘 (yacd)</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(clashSecret, 'clash_secret')}
+                    className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition active:scale-95"
+                  >
+                    {copiedFormat === 'clash_secret' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedFormat === 'clash_secret' ? '已复制' : '复制密钥'}</span>
+                  </button>
+                </div>
+                <div className="space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400">访问地址</span>
+                    <span className="font-mono text-slate-200 select-all">http://&lt;服务器IP&gt;:9090/ui</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-400">登录密钥 (Secret)</span>
+                    <span className="font-mono text-slate-200 select-all break-all text-right">{clashSecret}</span>
+                  </div>
+                  <p className="text-slate-500 leading-relaxed">
+                    浏览器打开上方地址，输入 Secret 后可实时查看各节点延迟、当前选中节点与流量明细，并可在网页手动切换节点。Docker 命令已包含
+                    <strong className="text-emerald-400"> -p 9090:9090 </strong>端口映射。
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

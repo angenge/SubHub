@@ -5,6 +5,7 @@ export interface SingboxGenerateOptions {
   listenAddress?: string; // default '0.0.0.0'
   testInterval?: string; // e.g. '3m', '5m'
   testTolerance?: number; // e.g. 50
+  clashApiSecret?: string; // enable experimental.clash_api dashboard (yacd) on port 9090 when provided
 }
 
 export function convertToSingboxOutbound(node: ProxyNode): any {
@@ -305,6 +306,17 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       auto_detect_interface: true,
     },
   };
+
+  if (options.clashApiSecret) {
+    (config as any).experimental = {
+      clash_api: {
+        external_controller: '0.0.0.0:9090',
+        external_ui: 'yacd',
+        secret: options.clashApiSecret,
+        default_mode: 'rule',
+      },
+    };
+  }
 
   return JSON.stringify(config, null, 2);
 }

@@ -13,6 +13,40 @@ import {
 } from '../../core/converters/index.js';
 import crypto from 'crypto';
 
+const SETTING_CLASH_SECRET = 'clash_api_secret';
+
+export async function getOrInitClashSecret(): Promise<string> {
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, SETTING_CLASH_SECRET));
+  const existing = rows[0];
+  if (existing && existing.value) {
+    return existing.value;
+  }
+
+  const newSecret = crypto.randomBytes(16).toString('hex');
+  const now = new Date().toISOString();
+  await db.insert(schema.settings).values({
+    key: SETTING_CLASH_SECRET,
+    value: newSecret,
+    updatedAt: now,
+  });
+  return newSecret;
+}
+
+export async function rotateClashSecret(): Promise<string> {
+  const newSecret = crypto.randomBytes(16).toString('hex');
+  const now = new Date().toISOString();
+
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, SETTING_CLASH_SECRET));
+  const existing = rows[0];
+  if (existing) {
+    await db.update(schema.settings).set({ value: newSecret, updatedAt: now }).where(eq(schema.settings.key, SETTING_CLASH_SECRET));
+  } else {
+    await db.insert(schema.settings).values({ key: SETTING_CLASH_SECRET, value: newSecret, updatedAt: now });
+  }
+
+  return newSecret;
+}
+
 export function parseDbAggregate(raw: any): AggregateGroup {
   return {
     id: raw.id,
@@ -225,8 +259,9 @@ export async function generateAggregateSubscription(
   const format = (targetFormatOverride || group.targetFormat || 'clash').toLowerCase();
 
   if (format === 'singbox' || format === 'sing-box') {
+    const clashApiSecret = await getOrInitClashSecret();
     return {
-      content: generateSingboxConfig(filteredNodes),
+      content: generateSingboxConfig(filteredNodes, { clashApiSecret }),
       contentType: 'application/json; charset=utf-8',
       filename: `${group.name}_singbox.json`,
       nodeCount: filteredNodes.length,
