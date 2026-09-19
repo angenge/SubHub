@@ -693,6 +693,60 @@ proxies:
     }
   });
 
+  await runAsyncTest('Security & Probe', '边缘探针密钥鉴权、节点分发与测速心跳上报 (Agent Probe Lifecycle)', async () => {
+    const {
+      getOrInitAgentSecret,
+      rotateAgentSecret,
+      validateAgentAuth,
+      getAgentConfig,
+      getAgentNodes,
+      processAgentReport,
+    } = await import('../../server/services/agentService.js');
+
+    const secret = await getOrInitAgentSecret();
+    if (!secret || !secret.startsWith('subprobe_')) {
+      throw new Error(`探针初始密钥格式异常: ${secret}`);
+    }
+
+    // 1. Check valid auth
+    const valid = await validateAgentAuth(`Bearer ${secret}`);
+    if (!valid) throw new Error('正确探针密钥鉴权失败');
+
+    // 2. Check invalid auth
+    const invalid = await validateAgentAuth('Bearer wrong_token_123');
+    if (invalid) throw new Error('错误探针密钥未被拦截');
+
+    // 3. Test report process
+    const mockReportData = [
+      {
+        nodeId: 'test_probe_node_1',
+        ping: 45,
+        status: 'online' as const,
+        checkedAt: new Date().toISOString(),
+      },
+    ];
+    const reportRes = await processAgentReport(mockReportData, '198.51.100.99');
+    if (reportRes.updatedCount !== 1) {
+      throw new Error('探针上报结果处理数量不正确');
+    }
+
+    // 4. Verify config reflects heartbeat
+    const config = await getAgentConfig();
+    if (config.lastHeartbeatIp !== '198.51.100.99' || !config.isOnline) {
+      throw new Error('探针心跳与状态未正确落库同步');
+    }
+
+    // 5. Test rotate secret
+    const newSecret = await rotateAgentSecret();
+    if (newSecret === secret) throw new Error('轮换后密钥未发生变化');
+    if (await validateAgentAuth(`Bearer ${secret}`)) {
+      throw new Error('旧探针密钥在轮换后仍然有效');
+    }
+    if (!(await validateAgentAuth(`Bearer ${newSecret}`))) {
+      throw new Error('新探针密钥验证失败');
+    }
+  });
+
   // ----------------------------------------------------
   // Category 5: User-Agent Auto-Detection & Format Routing
   // ----------------------------------------------------

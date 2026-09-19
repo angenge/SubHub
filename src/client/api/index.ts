@@ -45,7 +45,7 @@ async function safeFetchJson<T>(url: string, options?: RequestInit): Promise<T> 
     return json.data as T;
   } catch (err: any) {
     if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-      throw new Error('无法连接到 SubHub 后端服务，请确认服务端已启动 (端口 3000)');
+      throw new Error('无法连接到 SubHub 后端服务，请确认服务端已启动');
     }
     throw err;
   }
@@ -109,6 +109,23 @@ export async function changePassword(oldPassword: string, newPassword: string): 
     setStoredToken(res.token);
   }
   return res;
+}
+
+// ================= Agent Probe API =================
+export interface AgentProbeConfig {
+  secret: string;
+  lastHeartbeatAt?: string;
+  lastHeartbeatIp?: string;
+  lastReportNodeCount?: number;
+  isOnline: boolean;
+}
+
+export async function getAgentConfig(): Promise<AgentProbeConfig> {
+  return safeFetchJson<AgentProbeConfig>(`${API_BASE}/agent/config`);
+}
+
+export async function rotateAgentSecret(): Promise<{ secret: string }> {
+  return safeFetchJson<{ secret: string }>(`${API_BASE}/agent/rotate-secret`, { method: 'POST' });
 }
 
 // ================= Business API =================

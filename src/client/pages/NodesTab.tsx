@@ -27,6 +27,8 @@ interface NodesTabProps {
   onPingNode: (id: string) => Promise<void>;
   onPingAll: (subscriptionId?: string) => Promise<void>;
   onDeleteNode: (id: string) => void;
+  onOpenProbeConfig?: () => void;
+  probeOnline?: boolean;
 }
 
 export const NodesTab: React.FC<NodesTabProps> = ({
@@ -38,6 +40,8 @@ export const NodesTab: React.FC<NodesTabProps> = ({
   onPingNode,
   onPingAll,
   onDeleteNode,
+  onOpenProbeConfig,
+  probeOnline,
 }) => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -154,8 +158,20 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2">
-          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1">
+        <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap sm:flex-nowrap">
+          {/* Probe Agent Config Button */}
+          {onOpenProbeConfig && (
+            <button
+              onClick={onOpenProbeConfig}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition active:scale-95 shadow-sm"
+              title="配置本地/边缘探针服务进行真实测速"
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${probeOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span>📡 边缘探针配置</span>
+            </button>
+          )}
+
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 shrink-0">
             <button
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded-lg text-xs transition ${

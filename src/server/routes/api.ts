@@ -34,9 +34,51 @@ import {
   validateSessionToken,
   revokeSessionToken,
 } from '../services/authService.js';
+import {
+  getAgentConfig,
+  rotateAgentSecret,
+  validateAgentAuth,
+  getAgentNodes,
+  processAgentReport,
+} from '../services/agentService.js';
 import { checkRateLimit, getClientIpFromContext } from '../utils/rateLimiter.js';
 
 export const api = new Hono();
+
+// ================= Agent Probe Endpoints (Authenticated by Agent Secret) =================
+api.get('/agent/nodes', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  const isValid = await validateAgentAuth(authHeader);
+  if (!isValid) {
+    return c.json({ success: false, message: '探针授权失败，请检查 Agent Secret' }, 401);
+  }
+
+  const nodes = await getAgentNodes();
+  return c.json({ success: true, data: nodes });
+});
+
+api.post('/agent/report', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  const isValid = await validateAgentAuth(authHeader);
+  if (!isValid) {
+    return c.json({ success: false, message: '探针授权失败，请检查 Agent Secret' }, 401);
+  }
+
+  try {
+    const clientIp = getClientIpFromContext(c);
+    const body = await c.req.json();
+    const results = Array.isArray(body) ? body : body.results;
+
+    if (!Array.isArray(results)) {
+      return c.json({ success: false, message: '无效的测速上报数据格式' }, 400);
+    }
+
+    const reportRes = await processAgentReport(results, clientIp);
+    return c.json({ success: true, data: reportRes });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
 
 // ================= System & Capabilities (Public) =================
 api.get('/system/capabilities', (c) => {
@@ -149,7 +191,7 @@ api.post('/auth/change-password', async (c) => {
 
 // ================= Auth Middleware for Protected API =================
 api.use('*', async (c, next) => {
-  if (c.req.path.startsWith('/auth') || c.req.path.startsWith('/system')) {
+  if (c.req.path.startsWith('/auth') || c.req.path.startsWith('/system') || c.req.path.startsWith('/agent/nodes') || c.req.path.startsWith('/agent/report')) {
     return next();
   }
 
@@ -409,6 +451,25 @@ api.delete('/aggregates/:id/logs', async (c) => {
     const id = c.req.param('id');
     await clearAggregateLogs(id);
     return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+// ================= Agent Probe Management (Protected by Admin Auth) =================
+api.get('/agent/config', async (c) => {
+  try {
+    const config = await getAgentConfig();
+    return c.json({ success: true, data: config });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+api.post('/agent/rotate-secret', async (c) => {
+  try {
+    const newSecret = await rotateAgentSecret();
+    return c.json({ success: true, data: { secret: newSecret }, message: '探针密钥已成功轮换重置' });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }

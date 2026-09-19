@@ -1,0 +1,12 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY probe.js ./
+
+ENV SUBHUB_URL=""
+ENV AGENT_SECRET=""
+ENV INTERVAL_MINUTES=15
+ENV CONCURRENCY=25
+
+ENTRYPOINT ["node", "probe.js"]

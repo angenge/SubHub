@@ -9,10 +9,12 @@ import { SubscriptionModal } from './components/SubscriptionModal.js';
 import { AggregateModal } from './components/AggregateModal.js';
 import { ExportModal } from './components/ExportModal.js';
 import { ChangePasswordModal } from './components/ChangePasswordModal.js';
+import { ProbeModal } from './components/ProbeModal.js';
 import { SyncProgressModal, SyncProgressState, SyncItemLog } from './components/SyncProgressModal.js';
 import {
   checkAuthStatus,
   getCapabilities,
+  getAgentConfig,
   logout,
   getStats,
   getSubscriptions,
@@ -73,6 +75,9 @@ export const App: React.FC = () => {
   const [isAggModalOpen, setIsAggModalOpen] = useState(false);
   const [editingAgg, setEditingAgg] = useState<AggregateGroup | null>(null);
 
+  const [isProbeModalOpen, setIsProbeModalOpen] = useState(false);
+  const [probeOnline, setProbeOnline] = useState(false);
+
   const [exportAgg, setExportAgg] = useState<AggregateGroup | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -131,16 +136,20 @@ export const App: React.FC = () => {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [sData, subsData, nodesData, aggsData] = await Promise.all([
+      const [sData, subsData, nodesData, aggsData, probeData] = await Promise.all([
         getStats(),
         getSubscriptions(),
         getNodes(),
         getAggregates(),
+        getAgentConfig().catch(() => null),
       ]);
       setStats(sData);
       setSubscriptions(subsData);
       setNodes(nodesData);
       setAggregates(aggsData);
+      if (probeData) {
+        setProbeOnline(probeData.isOnline);
+      }
     } catch (err: any) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -513,6 +522,8 @@ export const App: React.FC = () => {
                 onPingNode={handlePingNode}
                 onPingAll={handlePingAllNodes}
                 onDeleteNode={handleDeleteNode}
+                onOpenProbeConfig={() => setIsProbeModalOpen(true)}
+                probeOnline={probeOnline}
               />
             )}
 
@@ -580,6 +591,13 @@ export const App: React.FC = () => {
         onClose={() => setIsChangePasswordModalOpen(false)}
         onSuccess={() => showToast('密码修改成功')}
         hasPasswordEnv={hasPasswordEnv}
+      />
+
+      {/* Probe Config Modal */}
+      <ProbeModal
+        isOpen={isProbeModalOpen}
+        onClose={() => setIsProbeModalOpen(false)}
+        onSecretChanged={loadAllData}
       />
 
       {/* Sync Progress Modal */}
