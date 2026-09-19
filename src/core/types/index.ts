@@ -151,6 +151,8 @@ export interface SyncLog {
   durationMs: number;
   nodeCount: number;
   nodeDiff?: number;
+  skipped?: number;
+  skippedDetail?: string;
   errorMessage?: string;
   createdAt: string;
 }

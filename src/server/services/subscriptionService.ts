@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
-import { parseNodesFromContent, parseSubscriptionUserInfo } from '../../core/parsers/index.js';
+import { parseNodesFromContentDetailed, parseSubscriptionUserInfo } from '../../core/parsers/index.js';
 import { ProxyNode } from '../../core/types/index.js';
 import crypto from 'crypto';
 import net from 'net';
@@ -124,6 +124,8 @@ export async function fetchRemoteSubscription(
       return {
         notModified: true,
         nodes: [] as ProxyNode[],
+        skipped: 0,
+        skippedDetail: null,
         userinfo: null,
         etag: options.etag,
         lastModified: options.lastModified,
@@ -144,11 +146,13 @@ export async function fetchRemoteSubscription(
     const userinfo = userInfoHeader ? parseSubscriptionUserInfo(userInfoHeader) : null;
 
     const content = await res.text();
-    const nodes = parseNodesFromContent(content);
+    const report = parseNodesFromContentDetailed(content);
 
     return {
       notModified: false,
-      nodes,
+      nodes: report.nodes,
+      skipped: report.skippedUnsupported,
+      skippedDetail: report.skippedDetail,
       userinfo,
       etag: newEtag,
       lastModified: newLastModified,
@@ -172,6 +176,8 @@ export async function recordSyncLog(data: {
   durationMs: number;
   nodeCount: number;
   nodeDiff?: number;
+  skipped?: number;
+  skippedDetail?: string;
   errorMessage?: string;
 }) {
   const id = `slog_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
@@ -186,6 +192,8 @@ export async function recordSyncLog(data: {
     durationMs: data.durationMs,
     nodeCount: data.nodeCount,
     nodeDiff: data.nodeDiff ?? 0,
+    skipped: data.skipped ?? 0,
+    skippedDetail: data.skippedDetail ?? null,
     errorMessage: data.errorMessage,
     createdAt: now,
   });
@@ -254,6 +262,8 @@ export async function createSubscription(data: {
   let lastModified: string | undefined;
   let durationMs = 0;
   let httpStatus: number | undefined = undefined;
+  let skippedCount = 0;
+  let skippedDetail: string | undefined;
 
   const startTime = Date.now();
   try {
@@ -264,6 +274,8 @@ export async function createSubscription(data: {
     etag = result.etag || undefined;
     lastModified = result.lastModified || undefined;
     httpStatus = result.httpStatus;
+    skippedCount = result.skipped || 0;
+    skippedDetail = result.skippedDetail || undefined;
   } catch (err: any) {
     durationMs = Date.now() - startTime;
     status = 'error';
@@ -305,6 +317,8 @@ export async function createSubscription(data: {
       durationMs,
       nodeCount: fetchedNodes.length,
       nodeDiff: fetchedNodes.length,
+      skipped: skippedCount,
+      skippedDetail,
       errorMessage,
     });
   } catch (logErr) {
@@ -488,7 +502,17 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
       durationMs,
       nodeCount: result.nodes.length,
       nodeDiff: result.nodes.length - previousCount,
+      skipped: result.skipped || 0,
+      skippedDetail: result.skippedDetail || undefined,
     });
+
+    if (result.skipped) {
+      console.debug(
+        `[Refresh] ${sub.name}: 跳过 ${result.skipped} 个不支持的节点${
+          result.skippedDetail ? ` (${result.skippedDetail})` : ''
+        }`
+      );
+    }
 
     return getSubscriptionById(id);
   } catch (err: any) {

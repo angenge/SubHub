@@ -122,6 +122,8 @@ export function initNodeDatabase() {
       duration_ms INTEGER NOT NULL DEFAULT 0,
       node_count INTEGER NOT NULL DEFAULT 0,
       node_diff INTEGER DEFAULT 0,
+      skipped INTEGER NOT NULL DEFAULT 0,
+      skipped_detail TEXT,
       error_message TEXT,
       created_at TEXT NOT NULL
     );

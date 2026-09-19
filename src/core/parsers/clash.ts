@@ -3,11 +3,21 @@ import { ProxyNode } from '../types/index.js';
 import { detectCountry } from '../utils/country.js';
 import { generateNodeId } from './uri.js';
 
+export interface ClashParseResult {
+  nodes: ProxyNode[];
+  skippedTypes: Record<string, number>;
+}
+
 export function parseClashConfig(content: string): ProxyNode[] {
+  return parseClashConfigDetailed(content).nodes;
+}
+
+export function parseClashConfigDetailed(content: string): ClashParseResult {
+  const skippedTypes: Record<string, number> = {};
   try {
     const doc = YAML.parse(content);
     if (!doc || !Array.isArray(doc.proxies)) {
-      return [];
+      return { nodes: [], skippedTypes };
     }
 
     const nodes: ProxyNode[] = [];
@@ -119,11 +129,13 @@ export function parseClashConfig(content: string): ProxyNode[] {
           obfsPassword: p['obfs-password'],
         };
         nodes.push(baseNode);
+      } else {
+        skippedTypes[type] = (skippedTypes[type] || 0) + 1;
       }
     }
 
-    return nodes;
+    return { nodes, skippedTypes };
   } catch (e) {
-    return [];
+    return { nodes: [], skippedTypes };
   }
 }

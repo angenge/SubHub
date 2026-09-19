@@ -97,6 +97,8 @@ export const syncLogs = sqliteTable('sync_logs', {
   durationMs: integer('duration_ms').notNull().default(0),
   nodeCount: integer('node_count').notNull().default(0),
   nodeDiff: integer('node_diff').default(0),
+  skipped: integer('skipped').notNull().default(0),
+  skippedDetail: text('skipped_detail'),
   errorMessage: text('error_message'),
   createdAt: text('created_at').notNull(),
 });

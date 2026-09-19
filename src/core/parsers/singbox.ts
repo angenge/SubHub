@@ -2,11 +2,21 @@ import { ProxyNode } from '../types/index.js';
 import { detectCountry } from '../utils/country.js';
 import { generateNodeId } from './uri.js';
 
+export interface SingboxParseResult {
+  nodes: ProxyNode[];
+  skippedTypes: Record<string, number>;
+}
+
 export function parseSingboxConfig(content: string): ProxyNode[] {
+  return parseSingboxConfigDetailed(content).nodes;
+}
+
+export function parseSingboxConfigDetailed(content: string): SingboxParseResult {
+  const skippedTypes: Record<string, number> = {};
   try {
     const doc = JSON.parse(content);
     if (!doc || !Array.isArray(doc.outbounds)) {
-      return [];
+      return { nodes: [], skippedTypes };
     }
 
     const nodes: ProxyNode[] = [];
@@ -91,11 +101,13 @@ export function parseSingboxConfig(content: string): ProxyNode[] {
           baseNode.skipCertVerify = ob.tls.insecure;
         }
         nodes.push(baseNode);
+      } else {
+        skippedTypes[type] = (skippedTypes[type] || 0) + 1;
       }
     }
 
-    return nodes;
+    return { nodes, skippedTypes };
   } catch (e) {
-    return [];
+    return { nodes: [], skippedTypes };
   }
 }

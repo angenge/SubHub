@@ -1,4 +1,4 @@
-import { parseNodesFromContent, parseUri } from '../parsers/index.js';
+import { parseNodesFromContent, parseNodesFromContentDetailed, parseUri } from '../parsers/index.js';
 import { processAggregateNodes } from '../engine/index.js';
 import { generateClashConfig } from '../converters/toClash.js';
 import { generateSingboxConfig } from '../converters/toSingbox.js';
@@ -88,6 +88,33 @@ function runTests() {
   const sbReservedJson = generateSingboxConfig([emptyNamedNode, reservedNamedNode]);
   console.assert(sbReservedJson.includes('direct (Node)'), 'Expected direct to be renamed to direct (Node) in Sing-box');
   console.log(`✅ Reserved Tag Anti-Collision & Empty Fallback verified.`);
+
+  // Test 8: Detailed parser with unsupported protocols reporting
+  const mixedList = [
+    sampleVless,
+    'ssr://unused.line',
+    'tuic://token@cn.example.com:443?sni=cn.example.com#CN-TUIC',
+    'hysteria://password@cn.example.com:443#CN-HY',
+    'vless://12345678-1234-1234-1234-1234567890ab@hk.example.com:notaport#broken',
+    sampleTrojan,
+  ].join('\n');
+  const report = parseNodesFromContentDetailed(mixedList);
+  console.assert(report.nodes.length === 2, `Expected 2 parsed nodes, got ${report.nodes.length}`);
+  console.assert(report.skippedUnsupported === 3, `Expected 3 skipped unsupported, got ${report.skippedUnsupported}`);
+  console.assert(report.skippedDetail !== null, 'Expected skippedDetail to be present');
+  const detail = JSON.parse(report.skippedDetail as string);
+  console.assert(detail.schemes?.ssr === 1, `Expected ssr count 1, got ${detail.schemes?.ssr}`);
+  console.assert(detail.schemes?.tuic === 1, `Expected tuic count 1, got ${detail.schemes?.tuic}`);
+  console.assert(detail.schemes?.hysteria === 1, `Expected hysteria count 1, got ${detail.schemes?.hysteria}`);
+  console.assert(detail.malformed?.vless === 1, `Expected malformed vless count 1, got ${detail.malformed?.vless}`);
+  console.log(`✅ Detailed Parser: Reported ${report.skippedUnsupported} skipped entries → ${report.skippedDetail}`);
+
+  // Test 9: Clash YAML with unsupported proxy types reporting
+  const clashWithUnsupported = `proxies:\n  - {name: "HK OK", type: vless, server: hk.example.com, port: 443, uuid: abc}\n  - {name: "CN TUIC", type: tuic, server: cn.example.com, port: 443, uuid: abc}`;
+  const clashReport = parseNodesFromContentDetailed(clashWithUnsupported);
+  console.assert(clashReport.nodes.length === 1, `Expected 1 clash node, got ${clashReport.nodes.length}`);
+  console.assert(clashReport.skippedUnsupported === 1, `Expected 1 skipped clash type, got ${clashReport.skippedUnsupported}`);
+  console.log(`✅ Clash Detailed Parser: skipped types = ${clashReport.skippedDetail}`);
 
   console.log('🎉 All SubHub Core Self-Verification Tests Passed!');
 }

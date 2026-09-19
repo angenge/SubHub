@@ -184,6 +184,14 @@ export const SyncLogModal: React.FC<SyncLogModalProps> = ({ isOpen, onClose, sub
                               {log.nodeDiff > 0 ? `+${log.nodeDiff}` : log.nodeDiff}
                             </span>
                           )}
+                          {typeof log.skipped === 'number' && log.skipped > 0 && (
+                            <span
+                              className="ml-1.5 text-[10px] font-bold text-amber-400"
+                              title={`未支持/无法解析的条目明细: ${log.skippedDetail || '未知'}`}
+                            >
+                              跳过 {log.skipped}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-slate-400 truncate max-w-xs select-all" title={log.errorMessage || '同步正常'}>
                           {log.errorMessage ? (
