@@ -289,7 +289,6 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
           type: 'udp',
           server: '223.5.5.5',
           server_port: 53,
-          detour: 'direct',
         },
       ],
       rules: dnsRules,
