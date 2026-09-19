@@ -191,7 +191,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Route rules fully compatible across Sing-box 1.8 ~ 1.15+ (ad-blocking, direct for CN/private, loop protection)
+  // Route rules fully compatible across Sing-box 1.12 ~ 1.15+ (ad-blocking, direct for CN/private, loop protection)
   const routeRules: any[] = [
     {
       protocol: 'dns',
@@ -216,6 +216,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
+  // Modern DNS format standard required since sing-box 1.12.0+ (removed legacy address field in 1.14+)
   const config = {
     log: {
       level: 'info',
@@ -225,12 +226,17 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       servers: [
         {
           tag: 'cf-dns',
-          address: 'https://1.1.1.1/dns-query',
+          type: 'https',
+          server: '1.1.1.1',
+          server_port: 443,
+          path: '/dns-query',
           detour: '🚀 节点选择',
         },
         {
           tag: 'local-dns',
-          address: '223.5.5.5',
+          type: 'udp',
+          server: '223.5.5.5',
+          server_port: 53,
           detour: 'direct',
         },
       ],
