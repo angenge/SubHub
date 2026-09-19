@@ -159,7 +159,6 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Outbounds without legacy 'type: dns'
   const outbounds: any[] = [
     {
       type: 'selector',
@@ -186,7 +185,32 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Standard route rules using modern 'action: hijack-dns' (Sing-box 1.11 ~ 1.15+ compliant)
+  // Modern Rule-Set definitions (Sing-box 1.12 ~ 1.15+ compliant)
+  const ruleSets = [
+    {
+      tag: 'geosite-category-ads-all',
+      type: 'remote',
+      format: 'binary',
+      url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs',
+      download_detour: '🚀 节点选择',
+    },
+    {
+      tag: 'geosite-cn',
+      type: 'remote',
+      format: 'binary',
+      url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
+      download_detour: '🚀 节点选择',
+    },
+    {
+      tag: 'geoip-cn',
+      type: 'remote',
+      format: 'binary',
+      url: 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
+      download_detour: '🚀 节点选择',
+    },
+  ];
+
+  // Route rules using rule_set instead of deprecated inline geosite/geoip
   const routeRules: any[] = [
     {
       action: 'sniff',
@@ -200,21 +224,31 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       outbound: 'direct',
     },
     {
-      geosite: 'category-ads-all',
-      outbound: 'block',
-    },
-    {
-      geosite: 'cn',
-      geoip: ['cn', 'private'],
+      ip_is_private: true,
       outbound: 'direct',
     },
     {
-      ip_is_private: true,
+      rule_set: 'geosite-category-ads-all',
+      outbound: 'block',
+    },
+    {
+      rule_set: ['geosite-cn', 'geoip-cn'],
       outbound: 'direct',
     },
   ];
 
-  // Modern DNS format standard required since sing-box 1.12.0+ (removed legacy address field in 1.14+)
+  // Modern DNS rules using rule_set
+  const dnsRules: any[] = [
+    {
+      outbound: 'any',
+      server: 'local-dns',
+    },
+    {
+      rule_set: 'geosite-cn',
+      server: 'local-dns',
+    },
+  ];
+
   const config = {
     log: {
       level: 'info',
@@ -238,21 +272,13 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
           detour: 'direct',
         },
       ],
-      rules: [
-        {
-          outbound: 'any',
-          server: 'local-dns',
-        },
-        {
-          geosite: 'cn',
-          server: 'local-dns',
-        },
-      ],
+      rules: dnsRules,
       strategy: 'ipv4_only',
     },
     inbounds,
     outbounds,
     route: {
+      rule_set: ruleSets,
       rules: routeRules,
       final: '🚀 节点选择',
       auto_detect_interface: true,
