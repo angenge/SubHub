@@ -79,8 +79,8 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
   const origin = window.location.origin;
   const secret = config?.secret || '********************************';
 
-  const nodeCommand = `SUBHUB_URL="${origin}" AGENT_SECRET="${secret}" node agent/probe.js`;
-  const dockerCommand = `docker run -d --name subhub-probe --restart unless-stopped -e SUBHUB_URL="${origin}" -e AGENT_SECRET="${secret}" -e INTERVAL_MINUTES=15 ghcr.io/angenge/subhub-probe:latest`;
+  const nodeCommand = `SUBHUB_URL="${origin}" AGENT_SECRET="${secret}" node probe.js`;
+  const dockerCommand = `docker run -d --name subhub-probe --restart unless-stopped -e SUBHUB_URL="${origin}" -e AGENT_SECRET="${secret}" -e INTERVAL_MINUTES=15 node:20-alpine sh -c "wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js && node probe.js"`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">

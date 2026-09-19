@@ -6,12 +6,31 @@
 
 ## 🚀 快速启动
 
-### 方式一：Node.js 单文件运行（推荐）
+### 方式一：Docker 一键常驻运行（推荐，免拉取私有镜像）
+
+直接使用官方 `node:20-alpine` 镜像，启动时自动拉取最新 `probe.js` 脚本运行：
+
+```bash
+docker run -d \
+  --name subhub-probe \
+  --restart unless-stopped \
+  -e SUBHUB_URL="https://subhub.hiz.one" \
+  -e AGENT_SECRET="subprobe_your_secret_here" \
+  -e INTERVAL_MINUTES=15 \
+  node:20-alpine sh -c "wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js && node probe.js"
+```
+
+---
+
+### 方式二：Node.js 单文件直接运行
 
 无需安装任何第三方 npm 依赖（基于 Node.js 原生标准库）：
 
 ```bash
-# 环境变量启动
+# 1. 下载 probe.js
+curl -fsSL https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js -o probe.js
+
+# 2. 环境变量启动
 SUBHUB_URL="https://subhub.hiz.one" AGENT_SECRET="subprobe_your_secret_here" node probe.js
 
 # 或直接传参启动
@@ -20,7 +39,7 @@ node probe.js "https://subhub.hiz.one" "subprobe_your_secret_here"
 
 ---
 
-### 方式二：Docker 容器运行（适合软路由 / NAS / Unraid）
+### 方式三：本地构建 Docker 镜像运行
 
 ```bash
 # 1. 本地构建探针镜像
