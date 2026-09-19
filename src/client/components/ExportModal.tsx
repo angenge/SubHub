@@ -256,7 +256,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
                     <span className="font-mono text-slate-200 select-all break-all text-right">{clashSecret}</span>
                   </div>
                   <p className="text-slate-500 leading-relaxed">
-                    浏览器打开上方地址，输入 Secret 后可实时查看各节点延迟、当前选中节点与流量明细，并可在网页手动切换节点。Docker 命令已包含
+                    浏览器打开 <strong className="text-sky-400">http://&lt;服务器IP&gt;:9090/ui</strong> 后，点右上角「Connect to a backend / 设置」，把后端地址改为
+                    <strong className="text-emerald-400"> http://&lt;服务器IP&gt;:9090 </strong>（不能是 127.0.0.1，那是你本机），Secret 填入上方密钥，点 Add / 连接即可查看各节点延迟、当前选中节点与流量明细并可手动切换节点。Docker 命令已包含
                     <strong className="text-emerald-400"> -p 9090:9090 </strong>端口映射。
                   </p>
                 </div>
