@@ -38,7 +38,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
   -e SUBHUB_URL="${singboxSubUrl}" \\
   -e UPDATE_INTERVAL=7200 \\
   --entrypoint sh \\
-  ghcr.io/sagernet/sing-box:latest \\
+  ghcr.io/sagernet/sing-box:v1.13.21 \\
   -c '
     wget -qO /config.json "$SUBHUB_URL" && sing-box run -c /config.json &
     PID=$!
@@ -203,7 +203,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
               <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
                 <span className="flex items-center gap-1.5 font-mono">
                   <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Docker 一键部署命令 (暴露端口 :1080 混合模式)</span>
+                  <span>Docker 一键部署命令 (Sing-box v1.13.21 端口混用)</span>
                 </span>
                 <button
                   type="button"
