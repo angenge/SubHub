@@ -123,7 +123,6 @@ export function convertToSingboxOutbound(node: ProxyNode): any {
 const SINGBOX_RESERVED_TAGS = new Set([
   'direct',
   'block',
-  'dns-out',
   'mixed-in',
   'cf-dns',
   'local-dns',
@@ -150,7 +149,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
 
   const fallbackTags = nodeTags.length > 0 ? nodeTags : ['direct'];
 
-  // Modern Inbound standard compliant with Sing-box 1.11 ~ 1.15+ (sniff/domain_strategy migrated to route action)
+  // Single mixed inbound: simultaneously handles SOCKS5 and HTTP on the same port (1080)
   const inbounds = [
     {
       type: 'mixed',
@@ -160,6 +159,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
+  // Outbounds without legacy 'type: dns'
   const outbounds: any[] = [
     {
       type: 'selector',
@@ -184,20 +184,16 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       type: 'block',
       tag: 'block',
     },
-    {
-      type: 'dns',
-      tag: 'dns-out',
-    },
   ];
 
-  // Modern Route rules compatible across Sing-box 1.11 ~ 1.15+
+  // Standard route rules using modern 'action: hijack-dns' (Sing-box 1.11 ~ 1.15+ compliant)
   const routeRules: any[] = [
     {
       action: 'sniff',
     },
     {
       protocol: 'dns',
-      outbound: 'dns-out',
+      action: 'hijack-dns',
     },
     {
       domain_suffix: ['hiz.one', 'subhub.hiz.one'],
@@ -252,6 +248,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
           server: 'local-dns',
         },
       ],
+      strategy: 'ipv4_only',
     },
     inbounds,
     outbounds,
