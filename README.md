@@ -1,7 +1,7 @@
 # SubHub 🌐
 
 > 现代化、轻量级、全功能的代理节点与订阅聚合管理平台。  
-> 帮助你一站式管理多机场订阅、节点健康检测、智能过滤去重与多客户端统一转换分发。
+> 帮助你一站式管理多机场订阅、真实网络测速、智能过滤去重与多客户端统一转换分发。
 
 ---
 
@@ -10,10 +10,37 @@
 在多节点管理与订阅分发场景中，用户常常面临以下痛点：
 - **机场订阅分散**：拥有多家机场或自建 VPS 节点，不同客户端间切换订阅极为繁琐；
 - **失效节点泛滥**：节点经常超时/断流，缺乏直观筛选剔除机制；
+- **云端测速失真**：云端机房测速反映的是境外数据中心延迟，无法代表国内家庭宽带/移动网络的真实体验；
 - **跨客户端配置繁重**：不同设备使用 Clash、Sing-box、Surge、Loon 等客户端，各格式配置不互通；
 - **命名混乱无序**：各服务商节点命名规则不一，缺乏统一格式化与国旗标识。
 
 **SubHub** 为此而生！它是一个轻量级、开箱即用的**订阅聚合与节点调度中枢**。只需将你的机场订阅导入 SubHub，即可自动解析、持续测速、按需过滤与正则改名，生成专属的永久聚合订阅链接，并根据客户端类型自动适配返回最佳格式。
+
+---
+
+## 🏛️ 系统架构设计
+
+SubHub 采用现代化的**「云端中枢调度 + 本地边缘真实探针」**分离架构，兼顾 0 成本高可用与本地真实网络测速：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│             Cloudflare 全球边缘网络 (SubHub 云端中枢)         │
+│                                                             │
+│  [Web 可视化控制台] ──(查看/管理)──> [Cloudflare D1 数据库]  │
+│  [多端客户端订阅]   <──(适配分发)── [聚合与规则过滤流水线]   │
+│                                           ▲                 │
+│                                           │ 定期回传延迟    │
+└───────────────────────────────────────────┼─────────────────┘
+                                            │ REST API (Token)
+┌───────────────────────────────────────────┴─────────────────┐
+│        本地设备 / 边缘节点 (家庭软路由 / NAS / 个人小主机)    │
+│                                                             │
+│   [SubHub Probe Agent 探针客户端]                           │
+│   ├── 定时调度 (每 15 分钟触发一次)                          │
+│   ├── 高并发 TCP Ping 探针池 (25 线程, 3 秒测完上百节点)     │
+│   └── 本地宽带真实握手延迟测算 (电信 / 联通 / 移动 / 校园网) │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -22,30 +49,31 @@
 - 🚀 **全格式自动解析**
   - 支持 **Clash (YAML)**、**Sing-box (JSON)**、**Base64** 编码及**原生节点 URI 列表**（VLESS、VMess、Trojan、Shadowsocks、Hysteria2）。
   - 自动提取订阅响应头中的流量信息（已用/总量）及过期时间。
-- ⚡ **TCP Ping 实时测速与健康检测**
-  - 高并发多节点延迟探针与批量健康检测（VPS/Docker 默认开启，Cloudflare 模式无缝转由客户端策略组探测）。
-  - 动态标定节点延迟状态（极速、良好、缓慢、超时），支持仅导出可用节点的策略过滤。
+- 📡 **三维立体测速与健康检测**
+  - **边缘探针分布式测速**：在软路由/NAS 运行 `probe.js`，测算真实家用宽带延迟并自动剔除坏节点；
+  - **客户端动态优选**：自动生成 `⚡ 自动选择`（URL-Test / Fallback）策略组，客户端运行时毫秒级自动切优；
+  - **服务端并发测速**：在 VPS 部署模式下支持 Web 控制台一键发起中心化测速。
 - 🛠️ **智能聚合流水线**
-  - **多源汇聚**：任意勾选/组合多个订阅源。
-  - **精细过滤**：支持协议白名单、包含关键词、排除关键词、最大允许延迟过滤。
+  - **多源汇聚**：任意勾选/组合多个启用状态的订阅源。
+  - **精细过滤**：支持协议白名单、包含关键词、排除关键词、最大允许延迟过滤（基于真实测速结果）。
   - **智能去重**：自动根据节点 IP + 端口去重，合并冗余节点。
   - **正则改名**：自定义多重正则表达式，批量格式化节点名称与国家旗帜。
 - 🔄 **多客户端智能自适应**
   - 生成单一永久聚合 Token 链接（`/sub/:token`）。
   - **自动 UA 识别**：根据请求来源（Clash.Meta、Sing-box、Surge、Loon、Shadowrocket 等）自动返回匹配格式。
   - 也可通过 URL 参数显式指定：`?target=clash|singbox|surge|loon|base64`。
-- 🖥️ **现代化可视化管理面板**
-  - 简洁美观的响应式 Web UI，支持实时状态概览、节点筛选、订阅源管理、操作与访问日志追踪。
+- 📱 **全终端响应式现代 UI**
+  - 完美适配手机、平板与桌面端，支持移动端专用底部导航栏与卡片视图。
 - 📦 **双轨部署架构**
-  - 支持 **Docker / Docker Compose / VPS Node.js** 本地常驻部署；
-  - 亦支持 **Cloudflare Workers + D1 + Assets** 0 成本全球 Serverless 边缘部署。
+  - 支持 **Cloudflare Workers + D1 + Assets** 0 成本全球 Serverless 边缘部署；
+  - 亦支持 **Docker / Docker Compose / VPS Node.js** 本地常驻部署。
 
 ---
 
 ## 🎯 典型使用场景
 
 1. **多机场整合**：将多个付费机场和自建 VPS 节点整合为一个统一的聚合链接；
-2. **自动剔除失效节点**：设置最大延迟阈值或仅导出在线节点，保障客户端连接高可用；
+2. **基于真实宽带剔除失效节点**：本地软路由定期测速，云端聚合自动剔除超时节点与高延迟节点；
 3. **团队 / 家庭共享**：统一维护订阅，为不同成员或设备分发专属聚合规则；
 4. **全平台无缝切换**：同一条聚合订阅链接，在 iOS (Surge/Loon/Shadowrocket)、Android (Clash/Sing-box)、Windows/macOS 客户端上均可直接导入。
 
@@ -63,33 +91,7 @@ cd SubHub
 
 ---
 
-### 方式一：Docker 一键部署（推荐，适合 VPS / 服务器）
-
-#### 1. 使用 Docker Compose（最便捷）
-```bash
-# 构建并后台启动
-docker compose up -d --build
-```
-
-#### 2. 使用标准 Docker 命令
-```bash
-# 1. 构建本地镜像
-docker build -t subhub:latest .
-
-# 2. 运行容器
-docker run -d \
-  --name subhub \
-  -p 3000:3000 \
-  -v $(pwd)/data:/app/data \
-  --restart unless-stopped \
-  subhub:latest
-```
-
-启动完成后，在浏览器访问 `http://<你的服务器IP>:3000` 即可进入管理后台。
-
----
-
-### 方式二：Cloudflare 全球边缘部署（0 成本 / 免服务器 / Serverless）
+### 方式一：Cloudflare 全球边缘部署（强烈推荐，0 成本 / 免服务器 / 永久在线）
 
 SubHub 原生兼容 Cloudflare Workers + D1 数据库 + Static Assets 静态托管架构：
 
@@ -126,6 +128,32 @@ npx wrangler deploy
 
 ---
 
+### 方式二：Docker 一键部署（适合 VPS / 私有服务器）
+
+#### 1. 使用 Docker Compose（最便捷）
+```bash
+# 构建并后台启动
+docker compose up -d --build
+```
+
+#### 2. 使用标准 Docker 命令
+```bash
+# 1. 构建本地镜像
+docker build -t subhub:latest .
+
+# 2. 运行容器
+docker run -d \
+  --name subhub \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  --restart unless-stopped \
+  subhub:latest
+```
+
+启动完成后，在浏览器访问 `http://<你的服务器IP>:3000` 即可进入管理后台。
+
+---
+
 ### 方式三：本地 / Linux 服务器直接运行 (Node.js)
 
 #### 前置要求
@@ -152,6 +180,30 @@ npm run dev
 
 # 另起终端启动后端 API 服务 (默认端口 3000)
 npm run dev:server
+```
+
+---
+
+## 📡 边缘测速探针运行指南 (SubHub Probe Agent)
+
+为了让 Cloudflare 云端聚合能够根据你**本地真实的宽带环境**筛选可用节点，可以在家里的软路由、NAS 或个人电脑上运行轻量探针：
+
+1. 打开 SubHub Web 控制台，进入「节点工作台」点击 **「📡 边缘探针配置」** 获取你的专属探针密钥；
+2. 在本地设备执行启动：
+
+```bash
+# 方式 1：Docker 一键常驻运行（推荐）
+docker run -d \
+  --name subhub-probe \
+  --restart unless-stopped \
+  -e SUBHUB_URL="https://your-subhub-domain.com" \
+  -e AGENT_SECRET="subprobe_your_secret_here" \
+  -e INTERVAL_MINUTES=15 \
+  node:20-alpine sh -c "wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js && node probe.js"
+
+# 方式 2：Node.js 单文件直接运行 (0 外部 npm 依赖)
+curl -fsSL https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js -o probe.js
+SUBHUB_URL="https://your-subhub-domain.com" AGENT_SECRET="subprobe_your_secret_here" node probe.js
 ```
 
 ---
