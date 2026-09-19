@@ -26,7 +26,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [url, setUrl] = useState('');
   const [customUserAgent, setCustomUserAgent] = useState('');
   const [autoUpdate, setAutoUpdate] = useState(true);
-  const [updateInterval, setUpdateInterval] = useState(360);
+  const [updateInterval, setUpdateInterval] = useState(180);
   const [status, setStatus] = useState<'active' | 'error' | 'disabled'>('active');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +38,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       setUrl(initialData?.url || '');
       setCustomUserAgent(initialData?.customUserAgent || '');
       setAutoUpdate(initialData?.autoUpdate ?? true);
-      setUpdateInterval(initialData?.updateInterval || 360);
+      setUpdateInterval(initialData?.updateInterval || 180);
       setStatus(initialData?.status || 'active');
       setError('');
       setLoading(false);
@@ -151,8 +151,8 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 text-xs sm:text-sm text-slate-100 outline-none"
               >
                 <option value={60}>每 1 小时</option>
-                <option value={180}>每 3 小时</option>
-                <option value={360}>每 6 小时 (推荐)</option>
+                <option value={180}>每 3 小时 (推荐)</option>
+                <option value={360}>每 6 小时</option>
                 <option value={720}>每 12 小时</option>
                 <option value={1440}>每 24 小时</option>
               </select>

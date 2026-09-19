@@ -91,10 +91,20 @@ subRouter.get('/:token', async (c) => {
       }
     }
 
+    let minIntervalMin = Infinity;
+    for (const sub of subs) {
+      if (!activeSubIds.has(sub.id)) continue;
+      const iv = sub.updateInterval && sub.updateInterval > 0 ? sub.updateInterval : 180;
+      if (iv < minIntervalMin) minIntervalMin = iv;
+    }
+    const updateHours = Number.isFinite(minIntervalMin)
+      ? Math.max(1, Math.min(24, Math.ceil(minIntervalMin / 60)))
+      : 3;
+
     const headers: Record<string, string> = {
       'Content-Type': contentType,
       'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
-      'Profile-Update-Interval': '12',
+      'Profile-Update-Interval': String(updateHours),
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',

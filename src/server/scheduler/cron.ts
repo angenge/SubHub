@@ -10,7 +10,7 @@ export async function runScheduledMaintenance() {
     for (const sub of subscriptions) {
       if (!sub.autoUpdate || sub.status === 'disabled') continue;
 
-      const intervalMs = (sub.updateInterval || 360) * 60 * 1000;
+      const intervalMs = (sub.updateInterval || 180) * 60 * 1000;
       const lastUpdated = sub.lastUpdatedAt ? new Date(sub.lastUpdatedAt).getTime() : 0;
 
       if (now - lastUpdated >= intervalMs) {

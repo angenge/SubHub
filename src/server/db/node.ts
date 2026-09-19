@@ -25,7 +25,7 @@ export function initNodeDatabase() {
       url TEXT NOT NULL,
       custom_user_agent TEXT,
       auto_update INTEGER NOT NULL DEFAULT 1,
-      update_interval INTEGER NOT NULL DEFAULT 360,
+      update_interval INTEGER NOT NULL DEFAULT 180,
       last_updated_at TEXT,
       upload INTEGER DEFAULT 0,
       download INTEGER DEFAULT 0,

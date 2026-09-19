@@ -276,7 +276,7 @@ export async function createSubscription(data: {
     url: trimmedUrl,
     customUserAgent: data.customUserAgent?.trim() || null,
     autoUpdate: data.autoUpdate !== false,
-    updateInterval: data.updateInterval || 360,
+    updateInterval: data.updateInterval || 180,
     lastUpdatedAt: status === 'active' ? now : null,
     upload: userinfo?.upload ?? 0,
     download: userinfo?.download ?? 0,

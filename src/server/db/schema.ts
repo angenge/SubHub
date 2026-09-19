@@ -6,7 +6,7 @@ export const subscriptions = sqliteTable('subscriptions', {
   url: text('url').notNull(),
   customUserAgent: text('custom_user_agent'),
   autoUpdate: integer('auto_update', { mode: 'boolean' }).notNull().default(true),
-  updateInterval: integer('update_interval').notNull().default(360), // default 6 hours
+  updateInterval: integer('update_interval').notNull().default(180), // default 3 hours
   lastUpdatedAt: text('last_updated_at'),
   upload: integer('upload').default(0),
   download: integer('download').default(0),
