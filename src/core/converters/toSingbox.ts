@@ -150,14 +150,13 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
 
   const fallbackTags = nodeTags.length > 0 ? nodeTags : ['direct'];
 
-  // Single mixed inbound: simultaneously handles SOCKS5 and HTTP on the same port (1080)
+  // Modern Inbound standard compliant with Sing-box 1.11 ~ 1.15+ (sniff/domain_strategy migrated to route action)
   const inbounds = [
     {
       type: 'mixed',
       tag: 'mixed-in',
       listen: listenAddress,
       listen_port: mixedPort,
-      sniff: true,
     },
   ];
 
@@ -191,8 +190,11 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Route rules fully compatible across Sing-box 1.12 ~ 1.15+ (ad-blocking, direct for CN/private, loop protection)
+  // Modern Route rules compatible across Sing-box 1.11 ~ 1.15+
   const routeRules: any[] = [
+    {
+      action: 'sniff',
+    },
     {
       protocol: 'dns',
       outbound: 'dns-out',
