@@ -36,6 +36,12 @@ export function convertToSingboxOutbound(node: ProxyNode): any {
         server_name: node.sni,
         insecure: node.skipCertVerify,
       };
+      if (node.fingerprint) {
+        base.tls.utls = {
+          enabled: true,
+          fingerprint: node.fingerprint,
+        };
+      }
     }
     if (node.network === 'ws') {
       base.transport = {
@@ -53,12 +59,22 @@ export function convertToSingboxOutbound(node: ProxyNode): any {
     base.uuid = node.uuid;
     base.flow = node.flow;
     if (node.tls) {
+      const isReality = !!node.reality;
       base.tls = {
         enabled: true,
         server_name: node.sni,
         insecure: node.skipCertVerify,
-        utls: node.fingerprint ? { enabled: true, fingerprint: node.fingerprint } : undefined,
+        // Reality requires uTLS to be enabled (default to 'chrome' if not specified)
+        utls: {
+          enabled: true,
+          fingerprint: node.fingerprint || (isReality ? 'chrome' : undefined),
+        },
       };
+
+      if (!base.tls.utls.fingerprint) {
+        delete base.tls.utls;
+      }
+
       if (node.reality) {
         base.tls.reality = {
           enabled: true,
@@ -86,6 +102,12 @@ export function convertToSingboxOutbound(node: ProxyNode): any {
       server_name: node.sni,
       insecure: node.skipCertVerify,
     };
+    if (node.fingerprint) {
+      base.tls.utls = {
+        enabled: true,
+        fingerprint: node.fingerprint,
+      };
+    }
     if (node.network === 'ws') {
       base.transport = {
         type: 'ws',
@@ -159,6 +181,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
+  // Outbounds without legacy 'type: dns'
   const outbounds: any[] = [
     {
       type: 'selector',
