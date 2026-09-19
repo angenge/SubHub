@@ -248,16 +248,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
                 </div>
                 <div className="space-y-1.5 text-[11px]">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-slate-400">访问地址</span>
-                    <span className="font-mono text-slate-200 select-all">http://&lt;服务器IP&gt;:9090/ui</span>
+                    <span className="text-slate-400">一键访问地址 (推荐)</span>
+                    <span className="font-mono text-slate-200 select-all break-all text-right">
+                      http://&lt;服务器IP&gt;:9090/ui/?hostname=&lt;服务器IP&gt;&amp;port=9090&amp;secret={clashSecret}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">登录密钥 (Secret)</span>
                     <span className="font-mono text-slate-200 select-all break-all text-right">{clashSecret}</span>
                   </div>
                   <p className="text-slate-500 leading-relaxed">
-                    浏览器打开 <strong className="text-sky-400">http://&lt;服务器IP&gt;:9090/ui</strong> 后，点右上角「Connect to a backend / 设置」，把后端地址改为
-                    <strong className="text-emerald-400"> http://&lt;服务器IP&gt;:9090 </strong>（不能是 127.0.0.1，那是你本机），Secret 填入上方密钥，点 Add / 连接即可查看各节点延迟、当前选中节点与流量明细并可手动切换节点。Docker 命令已包含
+                    打开<strong className="text-emerald-400">「一键访问地址」</strong>（把 &lt;服务器IP&gt; 换成真实 IP），yacd 会通过 URL 参数自动连接后端，无需手动设置。若站点仍显示
+                    <strong className="text-sky-400"> 127.0.0.1 </strong>
+                    ，请勿理会其内置默认后端，改用上述一键地址即可。Docker 命令已包含
                     <strong className="text-emerald-400"> -p 9090:9090 </strong>端口映射。
                   </p>
                 </div>
