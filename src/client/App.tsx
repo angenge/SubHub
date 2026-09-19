@@ -575,7 +575,6 @@ export const App: React.FC = () => {
         onSubmit={handleCreateOrUpdateAgg}
         initialData={editingAgg}
         subscriptions={subscriptions}
-        enableTcpPing={capabilities?.features.tcpPing !== false}
       />
 
       {/* Export Modal */}

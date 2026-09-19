@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Shuffle, Plus, Trash2, Loader2, Sparkles } from 'lucide-react';
+import { X, Shuffle, Plus, Trash2, Loader2, Sparkles, Filter, ShieldCheck, Zap } from 'lucide-react';
 import { AggregateGroup, Subscription, RenameRule, ProxyType } from '../../core/types/index.js';
 
 interface AggregateModalProps {
@@ -8,7 +8,6 @@ interface AggregateModalProps {
   onSubmit: (data: Partial<AggregateGroup> & { name: string }) => Promise<void>;
   initialData?: AggregateGroup | null;
   subscriptions: Subscription[];
-  enableTcpPing?: boolean;
 }
 
 const PROTOCOLS: { label: string; value: ProxyType }[] = [
@@ -25,7 +24,6 @@ export const AggregateModal: React.FC<AggregateModalProps> = ({
   onSubmit,
   initialData,
   subscriptions,
-  enableTcpPing = true,
 }) => {
   const [name, setName] = useState('');
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
@@ -287,46 +285,44 @@ export const AggregateModal: React.FC<AggregateModalProps> = ({
           </div>
 
           {/* Quality & Deduplicate Options */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={deduplicate}
-                onChange={(e) => setDeduplicate(e.target.checked)}
-                className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
-              />
-              <span className="text-xs text-slate-300 font-medium">智能去重 (IP+端口)</span>
+          <div>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>质量、去重与延迟筛选 (基于探针测速结果)</span>
             </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={deduplicate}
+                  onChange={(e) => setDeduplicate(e.target.checked)}
+                  className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
+                />
+                <span className="text-xs text-slate-300 font-medium">智能去重 (IP+端口)</span>
+              </label>
 
-            {enableTcpPing ? (
-              <>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={filterOnlineOnly}
-                    onChange={(e) => setFilterOnlineOnly(e.target.checked)}
-                    className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
-                  />
-                  <span className="text-xs text-slate-300 font-medium">仅保留在线节点</span>
-                </label>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filterOnlineOnly}
+                  onChange={(e) => setFilterOnlineOnly(e.target.checked)}
+                  className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0"
+                />
+                <span className="text-xs text-slate-300 font-medium">仅保留在线节点</span>
+              </label>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 whitespace-nowrap">最大延迟:</span>
-                  <input
-                    type="number"
-                    placeholder="不限"
-                    value={maxPing}
-                    onChange={(e) => setMaxPing(e.target.value)}
-                    className="w-20 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 outline-none"
-                  />
-                  <span className="text-xs text-slate-500">ms</span>
-                </div>
-              </>
-            ) : (
-              <div className="sm:col-span-2 flex items-center text-[11px] text-slate-500 italic">
-                * 边缘模式推荐配合客户端「自动选择」组使用
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 whitespace-nowrap">最大延迟:</span>
+                <input
+                  type="number"
+                  placeholder="不限"
+                  value={maxPing}
+                  onChange={(e) => setMaxPing(e.target.value)}
+                  className="w-20 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-100 outline-none"
+                />
+                <span className="text-xs text-slate-500">ms</span>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Renaming rules */}
