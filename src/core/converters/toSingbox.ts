@@ -3,7 +3,7 @@ import { ProxyNode } from '../types/index.js';
 export interface SingboxGenerateOptions {
   mixedPort?: number; // default 1080 (serves both SOCKS5 and HTTP simultaneously)
   listenAddress?: string; // default '0.0.0.0'
-  testInterval?: string; // e.g. '3m', '5m'
+  testInterval?: string; // e.g. '15m' - probe group interval
   testTolerance?: number; // e.g. 50
   clashApiSecret?: string; // enable experimental.clash_api dashboard (yacd) on port 9090 when provided
 }
@@ -150,13 +150,13 @@ const SINGBOX_RESERVED_TAGS = new Set([
   'cf-dns',
   'local-dns',
   '🚀 节点选择',
-  '⚡ 自动选择',
+  '🧪 节点探针',
 ]);
 
 export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenerateOptions = {}): string {
   const mixedPort = options.mixedPort || 1080;
   const listenAddress = options.listenAddress || '0.0.0.0';
-  const testInterval = options.testInterval || '3m';
+  const testInterval = options.testInterval || '15m';
   const testTolerance = options.testTolerance !== undefined ? options.testTolerance : 50;
 
   const safeNodes = nodes.map((n) => {
@@ -187,12 +187,14 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     {
       type: 'selector',
       tag: '🚀 节点选择',
-      outbounds: ['⚡ 自动选择', ...nodeTags, 'direct'],
-      default: '⚡ 自动选择',
+      outbounds: [...nodeTags, 'direct'],
+      default: nodeTags[0] || 'direct',
     },
     {
+      // Probe-only group: feeds latency ranking data via Clash API history,
+      // never routed to, so it does NOT auto-select real traffic.
       type: 'urltest',
-      tag: '⚡ 自动选择',
+      tag: '🧪 节点探针',
       outbounds: fallbackTags,
       url: 'http://www.gstatic.com/generate_204',
       interval: testInterval,
