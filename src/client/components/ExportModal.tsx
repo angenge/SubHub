@@ -37,8 +37,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
   -p 1080:1080 \\
   -e SUBHUB_URL="${singboxSubUrl}" \\
   -e UPDATE_INTERVAL=7200 \\
+  --entrypoint sh \\
   ghcr.io/sagernet/sing-box:latest \\
-  sh -c '
+  -c '
     wget -qO /config.json "$SUBHUB_URL" && sing-box run -c /config.json &
     PID=$!
     while true; do
