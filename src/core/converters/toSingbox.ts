@@ -272,7 +272,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
 
   const config = {
     log: {
-      level: 'info',
+      level: 'debug',
       timestamp: true,
     },
     dns: {
