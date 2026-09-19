@@ -116,6 +116,21 @@ function runTests() {
   console.assert(clashReport.skippedUnsupported === 1, `Expected 1 skipped clash type, got ${clashReport.skippedUnsupported}`);
   console.log(`✅ Clash Detailed Parser: skipped types = ${clashReport.skippedDetail}`);
 
+  // Test 10: Clash minimal template (fragment only, for OpenClash import)
+  const clashFull = generateClashConfig(processed);
+  console.assert(clashFull.includes('mixed-port: 7890') && clashFull.includes('external-controller'), 'Default clash config should include core global fields');
+  const clashMinimal = generateClashConfig(processed, { template: 'minimal' });
+  console.assert(!clashMinimal.includes('mixed-port'), 'Minimal clash config should not include mixed-port');
+  console.assert(!clashMinimal.includes('socks-port'), 'Minimal clash config should not include socks-port');
+  console.assert(!clashMinimal.includes('external-controller'), 'Minimal clash config should not include external-controller');
+  console.assert(!clashMinimal.includes('allow-lan'), 'Minimal clash config should not include allow-lan');
+  console.assert(!clashMinimal.includes('mode:'), 'Minimal clash config should not include mode');
+  console.assert(!clashMinimal.includes('enhanced-mode'), 'Minimal clash config should not include dns section');
+  console.assert(clashMinimal.includes('proxies:') && clashMinimal.includes('proxy-groups:') && clashMinimal.includes('MATCH,节点选择'), 'Minimal clash config should keep proxies/proxy-groups/rules');
+  const parsedMin = parseNodesFromContentDetailed(clashMinimal);
+  console.assert(parsedMin.nodes.length === processed.length, `Minimal clash fragment should parse all nodes, got ${parsedMin.nodes.length}`);
+  console.log(`✅ Clash Minimal Template: fragment-only output (${clashMinimal.length} bytes) valid for OpenClash import.`);
+
   console.log('🎉 All SubHub Core Self-Verification Tests Passed!');
 }
 

@@ -26,7 +26,7 @@ const FAILOVER_TIMEOUT_SEC = envNum('FAILOVER_TIMEOUT_SEC', 20);
 const MAX_TICKS = envNum('MAX_TICKS', 0);
 const NULL_OUT = process.platform === 'win32' ? 'NUL' : '/dev/null';
 
-const SELECTOR = '\u{1F680} \u8282\u70B9\u9009\u62E9';
+const SELECTOR = envStr('SELECTOR', '\u{1F680} \u8282\u70B9\u9009\u62E9');
 const DIRECT = 'direct';
 
 const badNodes = new Map<string, number>();
@@ -199,7 +199,7 @@ async function tick() {
 }
 
 if (!CLASH_SECRET) log('WARNING: CLASH_SECRET not set');
-log(`start host=${CLASH_HOST} proxy=${PROXY} min=${MIN_MBPS}Mbps interval=${INTERVAL_SEC}s dryRun=${DRY_RUN}`);
+log(`start host=${CLASH_HOST} selector='${SELECTOR}' proxy=${PROXY} min=${MIN_MBPS}Mbps interval=${INTERVAL_SEC}s dryRun=${DRY_RUN}`);
 
 await tick();
 if (DRY_RUN || MAX_TICKS === 1) process.exit(0);

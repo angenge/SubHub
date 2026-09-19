@@ -1,4 +1,4 @@
-import { ProxyNode } from '../types/index.js';
+﻿import { ProxyNode } from '../types/index.js';
 
 export interface SingboxGenerateOptions {
   mixedPort?: number; // default 1080 (serves both SOCKS5 and HTTP simultaneously)
@@ -149,8 +149,8 @@ const SINGBOX_RESERVED_TAGS = new Set([
   'mixed-in',
   'cf-dns',
   'local-dns',
-  '🚀 节点选择',
-  '🧪 节点探针',
+  '节点选择',
+  '节点探针',
 ]);
 
 export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenerateOptions = {}): string {
@@ -186,7 +186,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
   const outbounds: any[] = [
     {
       type: 'selector',
-      tag: '🚀 节点选择',
+      tag: '节点选择',
       outbounds: [...nodeTags, 'direct'],
       default: nodeTags[0] || 'direct',
     },
@@ -194,9 +194,9 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       // Probe-only group: feeds latency ranking data via Clash API history,
       // never routed to, so it does NOT auto-select real traffic.
       type: 'urltest',
-      tag: '🧪 节点探针',
+      tag: '节点探针',
       outbounds: fallbackTags,
-      url: 'http://www.gstatic.com/generate_204',
+      url: 'https://cp.cloudflare.com/generate_204',
       interval: testInterval,
       tolerance: testTolerance,
     },
@@ -218,21 +218,21 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs',
-      download_detour: '🚀 节点选择',
+      download_detour: '节点选择',
     },
     {
       tag: 'geosite-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
-      download_detour: '🚀 节点选择',
+      download_detour: '节点选择',
     },
     {
       tag: 'geoip-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
-      download_detour: '🚀 节点选择',
+      download_detour: '节点选择',
     },
   ];
 
@@ -285,7 +285,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
           server: '1.1.1.1',
           server_port: 443,
           path: '/dns-query',
-          detour: '🚀 节点选择',
+          detour: '节点选择',
         },
         {
           tag: 'local-dns',
@@ -304,7 +304,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       default_domain_resolver: 'local-dns',
       rule_set: ruleSets,
       rules: routeRules,
-      final: '🚀 节点选择',
+      final: '节点选择',
       auto_detect_interface: true,
     },
   };

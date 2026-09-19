@@ -301,7 +301,7 @@ export async function generateAggregateSubscription(
 
   // Default: Clash / Mihomo
   return {
-    content: generateClashConfig(filteredNodes),
+    content: generateClashConfig(filteredNodes, { template: group.clashTemplate }),
     contentType: 'text/yaml; charset=utf-8',
     filename: `${group.name}_clash.yaml`,
     nodeCount: filteredNodes.length,

@@ -7,6 +7,11 @@ import {
 import { getAllSubscriptions } from '../services/subscriptionService.js';
 import { checkRateLimit, getClientIpFromContext } from '../utils/rateLimiter.js';
 
+function asciiFilename(filename: string): string {
+  const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return safe || 'subscription.yaml';
+}
+
 export const subRouter = new Hono();
 
 function detectTargetFormat(ua: string): string {
@@ -103,7 +108,7 @@ subRouter.get('/:token', async (c) => {
 
     const headers: Record<string, string> = {
       'Content-Type': contentType,
-      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+      'Content-Disposition': `attachment; filename="${asciiFilename(filename)}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       'Profile-Update-Interval': String(updateHours),
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
