@@ -226,9 +226,7 @@ export async function generateAggregateSubscription(
 
   if (format === 'singbox' || format === 'sing-box') {
     return {
-      content: generateSingboxConfig(filteredNodes, {
-        mode: (group.singboxTemplate as any) || 'gateway',
-      }),
+      content: generateSingboxConfig(filteredNodes),
       contentType: 'application/json; charset=utf-8',
       filename: `${group.name}_singbox.json`,
       nodeCount: filteredNodes.length,

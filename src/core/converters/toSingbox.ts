@@ -1,13 +1,10 @@
 import { ProxyNode } from '../types/index.js';
 
 export interface SingboxGenerateOptions {
-  mode?: 'gateway' | 'client'; // 'gateway': TUN + SOCKS5 + HTTP + 0.0.0.0; 'client': 127.0.0.1:2080 mixed
-  socksPort?: number; // default 1080
-  httpPort?: number; // default 1081
-  enableTun?: boolean; // default true in gateway mode
+  mixedPort?: number; // default 1080 (serves both SOCKS5 and HTTP simultaneously)
+  listenAddress?: string; // default '0.0.0.0'
   testInterval?: string; // e.g. '3m', '5m'
   testTolerance?: number; // e.g. 50
-  enableAdblock?: boolean;
 }
 
 export function convertToSingboxOutbound(node: ProxyNode): any {
@@ -128,9 +125,6 @@ const SINGBOX_RESERVED_TAGS = new Set([
   'block',
   'dns-out',
   'mixed-in',
-  'socks-in',
-  'http-in',
-  'tun-in',
   'cf-dns',
   'local-dns',
   '🚀 节点选择',
@@ -138,9 +132,8 @@ const SINGBOX_RESERVED_TAGS = new Set([
 ]);
 
 export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenerateOptions = {}): string {
-  const isGateway = options.mode === 'gateway' || options.enableTun !== false;
-  const socksPort = options.socksPort || 1080;
-  const httpPort = options.httpPort || 1081;
+  const mixedPort = options.mixedPort || 1080;
+  const listenAddress = options.listenAddress || '0.0.0.0';
   const testInterval = options.testInterval || '3m';
   const testTolerance = options.testTolerance !== undefined ? options.testTolerance : 50;
 
@@ -157,45 +150,16 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
 
   const fallbackTags = nodeTags.length > 0 ? nodeTags : ['direct'];
 
-  const inbounds: any[] = [];
-
-  if (isGateway) {
-    // 1. SOCKS5 Inbound (Listen 0.0.0.0 for LAN)
-    inbounds.push({
-      type: 'socks',
-      tag: 'socks-in',
-      listen: '0.0.0.0',
-      listen_port: socksPort,
-    });
-    // 2. HTTP/Mixed Inbound (Listen 0.0.0.0 for LAN)
-    inbounds.push({
-      type: 'mixed',
-      tag: 'http-in',
-      listen: '0.0.0.0',
-      listen_port: httpPort,
-    });
-    // 3. TUN Transparent Gateway (Auto route for router/NAS/Linux)
-    if (options.enableTun !== false) {
-      inbounds.push({
-        type: 'tun',
-        tag: 'tun-in',
-        interface_name: 'tun0',
-        inet4_address: '172.19.0.1/30',
-        auto_route: true,
-        strict_route: true,
-        stack: 'system',
-        sniff: true,
-      });
-    }
-  } else {
-    // Client standalone mode (Localhost Mixed Proxy)
-    inbounds.push({
+  // Single mixed inbound: simultaneously handles SOCKS5 and HTTP on the same port (1080)
+  const inbounds = [
+    {
       type: 'mixed',
       tag: 'mixed-in',
-      listen: '127.0.0.1',
-      listen_port: 2080,
-    });
-  }
+      listen: listenAddress,
+      listen_port: mixedPort,
+      sniff: true,
+    },
+  ];
 
   const outbounds: any[] = [
     {
@@ -227,7 +191,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     },
   ];
 
-  // Compatible route rules supporting Sing-box 1.8 ~ 1.15+ (ad-blocking, direct for CN/LAN, bypass SubHub domain loop)
+  // Route rules fully compatible across Sing-box 1.8 ~ 1.15+ (ad-blocking, direct for CN/private, loop protection)
   const routeRules: any[] = [
     {
       protocol: 'dns',

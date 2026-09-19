@@ -12,7 +12,7 @@ interface ExportModalProps {
 export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggregate }) => {
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [activeQrFormat, setActiveQrFormat] = useState<string>('clash');
-  const [activeTab, setActiveTab] = useState<'links' | 'gateway'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'server'>('links');
 
   if (!isOpen || !aggregate) return null;
 
@@ -21,21 +21,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
 
   const links = [
     { label: 'Clash / Mihomo 订阅', format: 'clash', url: `${baseUrl}?target=clash`, badge: '推荐' },
-    { label: 'Sing-box 订阅 (含网关与Socks5)', format: 'singbox', url: `${baseUrl}?target=singbox`, badge: '全功能' },
+    { label: 'Sing-box 订阅 (含Socks5/HTTP混用)', format: 'singbox', url: `${baseUrl}?target=singbox`, badge: '极简' },
     { label: 'Surge 订阅', format: 'surge', url: `${baseUrl}?target=surge` },
     { label: 'Loon 订阅', format: 'loon', url: `${baseUrl}?target=loon` },
     { label: 'V2Ray / Base64 订阅', format: 'base64', url: `${baseUrl}?target=base64` },
-    { label: '自适应智能订阅 (根据UA)', format: 'auto', url: baseUrl, badge: '极简' },
+    { label: '自适应智能订阅 (根据UA)', format: 'auto', url: baseUrl, badge: '通用' },
   ];
 
   const activeLink = links.find((l) => l.format === activeQrFormat) || links[0];
   const singboxSubUrl = `${baseUrl}?target=singbox`;
 
-  const dockerGatewayCmd = `docker run -d \\
-  --name sing-box-gateway \\
+  const dockerServerCmd = `docker run -d \\
+  --name sing-box-proxy \\
   --restart unless-stopped \\
-  --net host \\
-  --cap-add NET_ADMIN \\
+  -p 1080:1080 \\
   -e SUBHUB_URL="${singboxSubUrl}" \\
   -e UPDATE_INTERVAL=7200 \\
   ghcr.io/sagernet/sing-box:latest \\
@@ -91,15 +90,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
             📋 客户端订阅与扫码
           </button>
           <button
-            onClick={() => setActiveTab('gateway')}
+            onClick={() => setActiveTab('server')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 flex items-center gap-1.5 ${
-              activeTab === 'gateway'
+              activeTab === 'server'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
             }`}
           >
             <Server className="w-3.5 h-3.5" />
-            <span>🏠 Sing-box 局域网网关/Socks5 部署</span>
+            <span>🚀 VPS / 本地 Sing-box 服务部署 (Socks5+HTTP混用)</span>
           </button>
         </div>
 
@@ -187,14 +186,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
             </div>
           </div>
         ) : (
-          /* Gateway & Docker Auto-Reload Mode */
+          /* Server & Mixed Mode (SOCKS5 + HTTP on port 1080) */
           <div className="space-y-3.5">
-            <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-1">
+            <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-1.5">
               <div className="font-semibold flex items-center gap-1.5 text-white">
-                <span>🌟 真正的一键部署 + 全自动定时热更新 (Zero Downtime)</span>
+                <span>🛡️ 安全纯净 + 端口混用 + 自动定时热更新 (Zero Downtime)</span>
               </div>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                无需在软路由/NAS上写复杂文件，容器启动后会自动拉取当前聚合配置，并在局域网提供 <strong className="text-emerald-400">Socks5 (:1080)</strong>、<strong className="text-sky-400">HTTP/Mixed (:1081)</strong> 以及 <strong className="text-purple-400">TUN 网关</strong> 服务。每隔 2 小时自动后台热重载最新节点，连接不中断！
+                无需担心整机路由被劫持（已完全移除 TUN 网卡模式，<strong className="text-emerald-400">VPS 的 SSH 端口与本地系统网络 100% 绝对安全</strong>）。
+                同一个 <strong className="text-sky-400">1080 端口</strong> 自动兼容 <strong className="text-white">Socks5</strong> 和 <strong className="text-white">HTTP/HTTPS</strong> 协议，每隔 2 小时后台自动热重载最新节点，连接不中断！
               </p>
             </div>
 
@@ -202,11 +202,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
               <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
                 <span className="flex items-center gap-1.5 font-mono">
                   <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Docker 一键部署命令 (兼容 Sing-box 1.13 ~ 1.15+)</span>
+                  <span>Docker 一键部署命令 (暴露端口 :1080 混合模式)</span>
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleCopy(dockerGatewayCmd, 'docker_gw')}
+                  onClick={() => handleCopy(dockerServerCmd, 'docker_gw')}
                   className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition active:scale-95"
                 >
                   {copiedFormat === 'docker_gw' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -215,7 +215,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
               </div>
 
               <pre className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[10px] sm:text-[11px] font-mono text-slate-300 overflow-x-auto select-all whitespace-pre-wrap">
-                {dockerGatewayCmd}
+                {dockerServerCmd}
               </pre>
             </div>
           </div>
@@ -223,7 +223,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
 
         {/* Footer */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 sm:pt-4 mt-3 sm:mt-4 border-t border-slate-800 text-[11px] sm:text-xs text-slate-400 text-center sm:text-left">
-          <span>💡 提示: 聚合订阅下发已全面兼容 Sing-box 1.13、1.14 以及 1.15+ 最新规则集标准。</span>
+          <span>💡 提示: 同一个 1080 端口可同时填入浏览器 HTTP 代理或 Telegram Socks5 代理中直接使用。</span>
           <button
             onClick={onClose}
             className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition active:scale-95"
