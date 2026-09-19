@@ -6,24 +6,34 @@
  * 作用：在本地软路由、NAS、个人电脑等真实用户网络环境下运行，
  * 定期向云端 SubHub 拉取节点，进行并发 TCP 握手测速并将真实延迟回传落库。
  *
- * 无任何外部依赖，基于 Node.js 原生 net 与 fetch 模块构建。
+ * 无任何外部依赖，基于 Node.js 原生 net 与 fetch 模块构建 (支持 CJS 与 ESM 双环境)。
  */
 
-const net = require('net');
+import net from 'node:net';
+
+// 强制刷新输出流缓冲区，防止在 Docker 容器或无 TTY 环境中出现输出卡顿
+if (process.stdout._handle && process.stdout._handle.setBlocking) {
+  process.stdout._handle.setBlocking(true);
+}
 
 const SUBHUB_URL = (process.env.SUBHUB_URL || process.argv[2] || '').replace(/\/+$/, '');
-const AGENT_SECRET = process.env.AGENT_SECRET || process.argv[3] || '';
+const AGENT_SECRET = (process.env.AGENT_SECRET || process.argv[3] || '').trim();
 const INTERVAL_MINUTES = parseInt(process.env.INTERVAL_MINUTES || '15', 10);
 const CONCURRENCY = parseInt(process.env.CONCURRENCY || '25', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '2500', 10);
 
+console.log('====================================================');
+console.log('📡 SubHub 边缘网络测速探针 (Edge Probe Agent)');
+console.log(`🔗 目标云端地址: ${SUBHUB_URL || '(未指定)'}`);
+console.log(`🔑 探针密钥状态: ${AGENT_SECRET ? '已配置 (' + AGENT_SECRET.slice(0, 10) + '...)' : '❌ 未配置'}`);
+console.log(`⏱️ 测速周期: 每 ${INTERVAL_MINUTES} 分钟自动执行一次`);
+console.log(`⚡ 探测并发: ${CONCURRENCY} 线程 | 超时: ${TIMEOUT_MS}ms`);
+console.log('====================================================');
+
 if (!SUBHUB_URL || !AGENT_SECRET) {
-  console.error('\n❌ 缺少必要配置参数！');
+  console.error('\n❌ 启动失败: 缺少必要配置参数！');
   console.error('使用方法:');
-  console.error('  方式 1 (环境变量):');
-  console.error('    SUBHUB_URL="https://subhub.yourdomain.com" AGENT_SECRET="subprobe_xxx" node probe.js');
-  console.error('  方式 2 (CLI 参数):');
-  console.error('    node probe.js "https://subhub.yourdomain.com" "subprobe_xxx"\n');
+  console.error('  SUBHUB_URL="https://subhub.hiz.one" AGENT_SECRET="subprobe_xxx" node probe.js\n');
   process.exit(1);
 }
 
@@ -92,7 +102,7 @@ async function batchPingNodes(nodes, concurrency = CONCURRENCY) {
       const currentIndex = index++;
       const node = nodes[currentIndex];
       try {
-        const { ping, error } = await tcpPing(node.server, node.port);
+        const { ping } = await tcpPing(node.server, node.port);
         let status = 'unknown';
         if (ping === -1) {
           status = 'timeout';
@@ -121,7 +131,8 @@ async function batchPingNodes(nodes, concurrency = CONCURRENCY) {
     }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, nodes.length) }, () => worker());
+  const workerCount = Math.max(1, Math.min(concurrency, nodes.length));
+  const workers = Array.from({ length: workerCount }, () => worker());
   await Promise.all(workers);
   return results;
 }
@@ -131,7 +142,7 @@ async function batchPingNodes(nodes, concurrency = CONCURRENCY) {
  */
 async function runProbeCycle() {
   const nowStr = new Date().toLocaleString();
-  console.log(`\n[${nowStr}] 🚀 开始执行新一轮边缘网络节点测速...`);
+  console.log(`\n[${nowStr}] 🚀 正在连接云端拉取待测节点...`);
 
   // 1. 获取待测节点列表
   let nodes = [];
@@ -154,16 +165,16 @@ async function runProbeCycle() {
     }
     nodes = json.data;
   } catch (err) {
-    console.error(`❌ 获取节点列表失败: ${err.message}`);
+    console.error(`❌ 拉取失败: ${err.message}`);
     return;
   }
 
   if (nodes.length === 0) {
-    console.log('ℹ️ 当前暂无待测节点（或所有订阅源均处于禁用状态）。');
+    console.log('ℹ️ 当前暂无可用待测节点（或所有订阅源均处于禁用状态）。');
     return;
   }
 
-  console.log(`📦 成功拉取 ${nodes.length} 个待测节点，正在启动并发探针 (${CONCURRENCY} 并发)...`);
+  console.log(`📦 成功拉取 ${nodes.length} 个节点，正在执行本地真实网络并发探针 (${CONCURRENCY} 并发)...`);
   const startTime = Date.now();
 
   // 2. 并发测速
@@ -174,10 +185,10 @@ async function runProbeCycle() {
   const slowCount = pingResults.filter((r) => r.status === 'slow').length;
   const timeoutCount = pingResults.filter((r) => r.status === 'timeout').length;
 
-  console.log(`⚡ 测速完成 (耗时 ${durationMs}ms): 🟢 极速在线 ${onlineCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}`);
+  console.log(`⚡ 本地测速完成 (耗时 ${durationMs}ms): 🟢 极速在线 ${onlineCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}`);
 
   // 3. 打包批量回传落库
-  console.log('📤 正在将测试结果批量回传至 SubHub 云端...');
+  console.log('📤 正在将测速与健康度结果上报至云端 SubHub...');
   try {
     const reportRes = await fetch(`${SUBHUB_URL}/api/agent/report`, {
       method: 'POST',
@@ -199,20 +210,14 @@ async function runProbeCycle() {
       throw new Error(reportJson.message || '上报结果保存失败');
     }
 
-    console.log(`✅ 成功同步 ${reportJson.data?.updatedCount || pingResults.length} 个节点的真实网络延迟至云端！`);
+    console.log(`✅ 同步成功！已更新 ${reportJson.data?.updatedCount || pingResults.length} 个节点的真实网络延迟。`);
+    console.log(`💤 进入休眠，将在 ${INTERVAL_MINUTES} 分钟后执行下一轮测速...\n`);
   } catch (err) {
-    console.error(`❌ 上报测速结果失败: ${err.message}`);
+    console.error(`❌ 上报失败: ${err.message}`);
   }
 }
 
 async function main() {
-  console.log('====================================================');
-  console.log('📡 SubHub 边缘网络测速探针 (Edge Probe Agent) 已启动');
-  console.log(`🔗 目标 SubHub 服务: ${SUBHUB_URL}`);
-  console.log(`⏱️ 探测轮询周期: ${INTERVAL_MINUTES} 分钟`);
-  console.log(`⚡ 并发探测线程: ${CONCURRENCY}`);
-  console.log('====================================================');
-
   // 立即执行首轮
   await runProbeCycle();
 

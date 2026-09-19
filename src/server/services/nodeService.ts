@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { ProxyNode, PingResult } from '../../core/types/index.js';
 import { batchPingNodes, pingNode } from '../../core/ping/index.js';
@@ -46,7 +46,6 @@ export function parseDbNode(raw: any): ProxyNode {
 }
 
 export async function getAllNodes(subscriptionId?: string, includeDisabled = false): Promise<ProxyNode[]> {
-  // If not including disabled, filter out nodes belonging to disabled subscriptions
   let activeSubIdSet: Set<string> | null = null;
   if (!includeDisabled) {
     const allSubs = await getAllSubscriptions();
@@ -144,8 +143,23 @@ export async function updateNodePingResult(res: PingResult) {
 
 export async function batchUpdatePingResults(results: PingResult[]) {
   if (results.length === 0) return;
-  for (const item of results) {
-    await updateNodePingResult(item);
+
+  // Execute in parallel batches of 10 to minimize roundtrip latency while staying within D1 limits
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < results.length; i += BATCH_SIZE) {
+    const batch = results.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map((item) =>
+        db
+          .update(schema.nodes)
+          .set({
+            ping: item.ping,
+            status: item.status,
+            lastCheckedAt: item.checkedAt,
+          })
+          .where(eq(schema.nodes.id, item.nodeId))
+      )
+    );
   }
 }
 
