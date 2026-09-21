@@ -24,6 +24,7 @@ DEVELOPMENT.md
 DEPLOYMENT.md
 
 # Logs & Temp
+.wrangler/
 logs
 *.log
 npm-debug.log*

@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { getAllNodes, batchUpdatePingResults } from './nodeService.js';
 import { PingResult } from '../../core/types/index.js';
-import { generateClashConfig } from '../../core/converters/toClash.js';
+import { convertToClashProxyObject } from '../../core/converters/toClash.js';
+import YAML from 'yaml';
 import crypto from 'crypto';
 
 export interface AgentConfig {
@@ -101,10 +102,33 @@ export async function getAgentNodes() {
     name: `[${n.id}] ${(n.name || `${n.server}:${n.port}`).trim()}`,
   }));
 
-  const clashConfig = generateClashConfig(mappedNodes);
+  // 生成专供探针 URL-Test 的精简纯粹配置（不含任何 GeoIP/MMDB/fake-ip 依赖，秒级加载防卡顿）
+  const proxyList = mappedNodes.map(convertToClashProxyObject);
+  const probeClashConfig = YAML.stringify({
+    'mixed-port': 0,
+    'allow-lan': false,
+    mode: 'direct',
+    'log-level': 'silent',
+    'external-controller': '127.0.0.1:9090',
+    dns: {
+      enable: true,
+      ipv6: false,
+      'enhanced-mode': 'redir-host',
+      nameserver: [
+        '223.5.5.5',
+        '119.29.29.29',
+        '1.1.1.1',
+        '8.8.8.8',
+      ],
+    },
+    proxies: proxyList,
+    rules: [
+      'MATCH,DIRECT',
+    ],
+  });
 
   return {
-    clashConfig,
+    clashConfig: probeClashConfig,
     nodes: mappedNodes.map((n) => ({
       id: n.id,
       name: n.name,

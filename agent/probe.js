@@ -30,7 +30,7 @@ const SUBHUB_URL = (process.env.SUBHUB_URL || process.argv[2] || '').replace(/\/
 const AGENT_SECRET = (process.env.AGENT_SECRET || process.argv[3] || '').trim();
 const INTERVAL_MINUTES = parseInt(process.env.INTERVAL_MINUTES || '15', 10);
 const CONCURRENCY = parseInt(process.env.CONCURRENCY || '20', 10);
-const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '5000', 10);
+const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '8000', 10);
 const TEST_URL = process.env.TEST_URL || 'https://cp.cloudflare.com/generate_204';
 const MIHOMO_BIN = process.env.MIHOMO_PATH || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo');
 const MIHOMO_PORT = parseInt(process.env.MIHOMO_PORT || '9090', 10);
@@ -258,13 +258,15 @@ async function reloadMihomoConfig(clashYaml) {
   }
 }
 
+let apiErrorLogged = false;
+
 /**
  * 通过 Mihomo 官方 URL-Test 接口单节点测速
  */
 async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
   const url = `${MIHOMO_API}/proxies/${encodeURIComponent(nodeName)}/delay?timeout=${timeoutMs}&url=${encodeURIComponent(TEST_URL)}`;
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs + 1000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs + 2000) });
     if (!res.ok) {
       return { ping: -1, status: 'timeout' };
     }
@@ -273,14 +275,16 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
 
     if (delay <= 0) {
       return { ping: -1, status: 'timeout' };
-    } else if (delay < 300) {
+    } else if (delay < 450) {
       return { ping: delay, status: 'online' };
-    } else if (delay < 800) {
-      return { ping: delay, status: 'slow' };
     } else {
-      return { ping: delay, status: 'timeout' };
+      return { ping: delay, status: 'slow' };
     }
-  } catch {
+  } catch (err) {
+    if (!apiErrorLogged && (err.code === 'ECONNREFUSED' || (err.cause && err.cause.code === 'ECONNREFUSED'))) {
+      apiErrorLogged = true;
+      console.error(`\n⚠️ 警告: 无法连接本地 Mihomo API (${MIHOMO_API})，请确认内核进程是否存活！`);
+    }
     return { ping: -1, status: 'timeout' };
   }
 }
