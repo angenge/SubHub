@@ -118,7 +118,7 @@ export const AggregatesTab: React.FC<AggregatesTabProps> = ({
                       title="获取订阅链接与手机二维码"
                     >
                       <QrCode className="w-3.5 h-3.5" />
-                      <span className="hidden xs:inline sm:inline">订阅 / 扫码</span>
+                      <span className="hidden sm:inline">订阅 / 扫码</span>
                     </button>
                     <button
                       onClick={() => setSelectedAggForLogs(agg)}

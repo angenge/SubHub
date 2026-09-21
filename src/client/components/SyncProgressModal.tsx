@@ -31,8 +31,8 @@ export const SyncProgressModal: React.FC<SyncProgressModalProps> = ({ isOpen, on
   const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+      <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-6 text-slate-100 space-y-4 sm:space-y-5 my-auto">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">

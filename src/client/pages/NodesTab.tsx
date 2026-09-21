@@ -121,10 +121,18 @@ export const NodesTab: React.FC<NodesTabProps> = ({
 
   // Pagination slice
   const totalPages = Math.max(1, Math.ceil(filteredNodes.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+
+  React.useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const paginatedNodes = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredNodes.slice(start, start + pageSize);
-  }, [filteredNodes, currentPage, pageSize]);
+  }, [filteredNodes, safeCurrentPage, pageSize]);
 
   const handlePingAll = async () => {
     setIsPingingAll(true);
@@ -457,8 +465,8 @@ export const NodesTab: React.FC<NodesTabProps> = ({
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 text-[11px] sm:text-xs text-slate-400 border-t border-slate-800/80">
           <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
             <span>
-              第 <strong className="text-white">{(currentPage - 1) * pageSize + 1}</strong>-
-              <strong className="text-white">{Math.min(currentPage * pageSize, filteredNodes.length)}</strong> 条，共{' '}
+              第 <strong className="text-white">{(safeCurrentPage - 1) * pageSize + 1}</strong>-
+              <strong className="text-white">{Math.min(safeCurrentPage * pageSize, filteredNodes.length)}</strong> 条，共{' '}
               <strong className="text-white">{filteredNodes.length}</strong> 条
             </span>
             <span className="text-slate-600">|</span>
@@ -481,17 +489,17 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
+              disabled={safeCurrentPage <= 1}
               className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 disabled:opacity-40 disabled:hover:bg-slate-900 flex items-center gap-1 transition active:scale-95"
             >
               <ChevronLeft className="w-3.5 h-3.5" /> 上页
             </button>
             <span className="px-2.5 py-1 font-mono text-slate-300">
-              {currentPage} / {totalPages}
+              {safeCurrentPage} / {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
+              disabled={safeCurrentPage >= totalPages}
               className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 disabled:opacity-40 disabled:hover:bg-slate-900 flex items-center gap-1 transition active:scale-95"
             >
               下页 <ChevronRight className="w-3.5 h-3.5" />

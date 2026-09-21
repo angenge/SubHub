@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   v1.0
                 </span>
               </div>
-              <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:block sm:block truncate max-w-[140px] sm:max-w-none">
+              <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block truncate sm:max-w-none">
                 订阅聚合与节点探针
               </p>
             </div>
