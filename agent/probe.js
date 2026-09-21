@@ -29,7 +29,7 @@ if (process.stdout._handle && process.stdout._handle.setBlocking) {
 const SUBHUB_URL = (process.env.SUBHUB_URL || process.argv[2] || '').replace(/\/+$/, '');
 const AGENT_SECRET = (process.env.AGENT_SECRET || process.argv[3] || '').trim();
 const INTERVAL_MINUTES = parseInt(process.env.INTERVAL_MINUTES || '15', 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || '20', 10);
+const CONCURRENCY = parseInt(process.env.CONCURRENCY || '2', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '8000', 10);
 const TEST_URL = process.env.TEST_URL || 'https://cp.cloudflare.com/generate_204';
 const MIHOMO_BIN = process.env.MIHOMO_PATH || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo');

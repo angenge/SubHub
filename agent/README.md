@@ -23,7 +23,7 @@ docker run -d \
   -e SUBHUB_URL="https://subhub.yourdomain.com" \
   -e AGENT_SECRET="subprobe_your_secret_here" \
   -e INTERVAL_MINUTES=15 \
-  -e CONCURRENCY=20 \
+  -e CONCURRENCY=2 \
   ghcr.io/angenge/subhub-probe:latest # 或自行构建镜像
 ```
 
@@ -61,8 +61,8 @@ docker run -d \
 | `SUBHUB_URL` | *(必填)* | 你的 SubHub 访问地址（例如 `https://subhub.yourdomain.com`） |
 | `AGENT_SECRET` | *(必填)* | 在 SubHub Web 面板「节点工作台 ➔ 边缘探针配置」中获取的密钥 |
 | `INTERVAL_MINUTES` | `15` | 定时测速周期（分钟） |
-| `CONCURRENCY` | `20` | 并发测速任务数 |
-| `TIMEOUT_MS` | `5000` | 单个节点测速超时时间（毫秒） |
+| `CONCURRENCY` | `2` | 并发测速任务数（默认2，适合软路由/玩客云等轻量设备） |
+| `TIMEOUT_MS` | `8000` | 单个节点测速超时时间（毫秒） |
 | `TEST_URL` | `https://cp.cloudflare.com/generate_204` | 测速基准 URL |
 | `MIHOMO_PATH` | `mihomo` | 自定义 Mihomo 可执行文件路径 |
 | `MIHOMO_PORT` | `9090` | Mihomo 外部控制器本地监听端口 |
