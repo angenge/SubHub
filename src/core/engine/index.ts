@@ -21,7 +21,13 @@ export function deduplicateNodes(nodes: ProxyNode[]): ProxyNode[] {
   const uniqueNodes: ProxyNode[] = [];
 
   for (const node of nodes) {
-    const key = `${node.type}:${node.server.toLowerCase()}:${node.port}:${node.uuid || node.password || node.cipher || ''}`;
+    const cred = node.uuid || node.password || node.cipher || '';
+    const net = node.network || 'tcp';
+    const tls = node.tls ? 'tls' : 'notls';
+    const sni = node.sni || '';
+    const flow = node.flow || '';
+    const pathOrService = node.wsOpts?.path || node.grpcOpts?.serviceName || node.reality?.publicKey || '';
+    const key = `${node.type}:${node.server.toLowerCase()}:${node.port}:${cred}:${net}:${tls}:${sni}:${flow}:${pathOrService}`;
     if (!seen.has(key)) {
       seen.add(key);
       uniqueNodes.push(node);

@@ -14,7 +14,8 @@ function asciiFilename(filename: string): string {
 
 export const subRouter = new Hono();
 
-function detectTargetFormat(ua: string): string {
+function detectTargetFormat(ua: string): string | null {
+  if (!ua) return null;
   const lowerUA = ua.toLowerCase();
   if (lowerUA.includes('clash') || lowerUA.includes('mihomo') || lowerUA.includes('stash')) {
     return 'clash';
@@ -31,7 +32,7 @@ function detectTargetFormat(ua: string): string {
   if (lowerUA.includes('shadowrocket') || lowerUA.includes('quantumult') || lowerUA.includes('v2ray')) {
     return 'base64';
   }
-  return 'clash';
+  return null;
 }
 
 subRouter.get('/:token', async (c) => {

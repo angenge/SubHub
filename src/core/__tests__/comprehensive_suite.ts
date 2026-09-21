@@ -26,8 +26,14 @@ import { initNodeDatabase } from '../../server/db/node.js';
 import { setDefaultDb } from '../../server/db/index.js';
 import net from 'net';
 import path from 'path';
+import os from 'os';
+import fs from 'fs';
 
-// Initialize test database
+// Initialize test database in isolated temporary directory
+const testDataDir = path.join(os.tmpdir(), `subhub-test-${Date.now()}`);
+fs.mkdirSync(testDataDir, { recursive: true });
+process.env.DATA_DIR = testDataDir;
+
 const { db: testDb } = initNodeDatabase();
 setDefaultDb(testDb);
 

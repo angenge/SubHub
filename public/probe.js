@@ -59,19 +59,25 @@ if (!SUBHUB_URL || !AGENT_SECRET) {
 }
 
 // 保证退出时清理子进程
-function cleanupAndExit(code = 0) {
+function killMihomo() {
   if (mihomoProcess && !mihomoProcess.killed) {
     try {
       console.log('🛑 正在关闭 Mihomo 内核进程...');
       mihomoProcess.kill('SIGTERM');
     } catch {}
   }
+}
+
+function cleanupAndExit(code = 0) {
+  killMihomo();
   process.exit(code);
 }
 
 process.on('SIGINT', () => cleanupAndExit(0));
 process.on('SIGTERM', () => cleanupAndExit(0));
-process.on('exit', () => cleanupAndExit(0));
+process.on('exit', () => {
+  killMihomo();
+});
 
 /**
  * 自动定位或下载适配当前系统架构的 Mihomo 内核二进制
@@ -259,9 +265,11 @@ rules:
  * 重新加载 Mihomo 代理配置
  */
 async function reloadMihomoConfig(clashYaml) {
-  // 确保外控端口与配置要求一致
+  // 确保外控端口与当前探针实际监听端口一致
   let configToSave = clashYaml;
-  if (!configToSave.includes('external-controller')) {
+  if (/external-controller:.*$/m.test(configToSave)) {
+    configToSave = configToSave.replace(/external-controller:.*$/m, `external-controller: 127.0.0.1:${MIHOMO_PORT}`);
+  } else {
     configToSave = `external-controller: 127.0.0.1:${MIHOMO_PORT}\n` + configToSave;
   }
 
@@ -281,6 +289,7 @@ async function reloadMihomoConfig(clashYaml) {
 }
 
 let apiErrorLogged = false;
+let currentCycleApiErrors = 0;
 
 /**
  * 通过 Mihomo 官方 URL-Test 接口单节点测速
@@ -303,9 +312,12 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
       return { ping: delay, status: 'slow' };
     }
   } catch (err) {
-    if (!apiErrorLogged && (err.code === 'ECONNREFUSED' || (err.cause && err.cause.code === 'ECONNREFUSED'))) {
-      apiErrorLogged = true;
-      console.error(`\n⚠️ 警告: 无法连接本地 Mihomo API (${MIHOMO_API})，请确认内核进程是否存活！`);
+    if (err.code === 'ECONNREFUSED' || (err.cause && err.cause.code === 'ECONNREFUSED')) {
+      currentCycleApiErrors++;
+      if (!apiErrorLogged) {
+        apiErrorLogged = true;
+        console.error(`\n⚠️ 警告: 无法连接本地 Mihomo API (${MIHOMO_API})，请确认内核进程是否存活！`);
+      }
     }
     return { ping: -1, status: 'timeout' };
   }
@@ -397,8 +409,15 @@ async function runProbeCycle() {
   const startTime = Date.now();
 
   // 3. 顺序串行测速（单并发）
+  currentCycleApiErrors = 0;
   const pingResults = await batchTestNodes(nodes);
   const durationMs = Date.now() - startTime;
+
+  if (currentCycleApiErrors >= nodes.length && nodes.length > 0) {
+    console.error(`⚠️ 本轮测速本地 Mihomo 控制器全无响应 (${currentCycleApiErrors}/${nodes.length})，跳过上报以防误写节点为超时。`);
+    apiErrorLogged = false;
+    return;
+  }
 
   const onlineCount = pingResults.filter((r) => r.status === 'online').length;
   const slowCount = pingResults.filter((r) => r.status === 'slow').length;

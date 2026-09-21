@@ -107,7 +107,10 @@ api.get('/auth/status', async (c) => {
 api.post('/auth/init', async (c) => {
   try {
     const status = await getAuthStatus();
-    if (status.initialized && !status.hasPasswordEnv) {
+    if (status.hasPasswordEnv) {
+      return c.json({ success: false, message: '当前密码由环境变量 ADMIN_PASSWORD 管理，请直接登录' }, 400);
+    }
+    if (status.initialized) {
       return c.json({ success: false, message: '系统已初始化密码，请直接登录' }, 400);
     }
     const body = await c.req.json();
