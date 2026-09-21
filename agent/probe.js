@@ -29,7 +29,7 @@ if (process.stdout._handle && process.stdout._handle.setBlocking) {
 const SUBHUB_URL = (process.env.SUBHUB_URL || process.argv[2] || '').replace(/\/+$/, '');
 const AGENT_SECRET = (process.env.AGENT_SECRET || process.argv[3] || '').trim();
 const INTERVAL_MINUTES = parseInt(process.env.INTERVAL_MINUTES || '15', 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || '2', 10);
+const CONCURRENCY = parseInt(process.env.CONCURRENCY || '1', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '8000', 10);
 const TEST_URL = process.env.TEST_URL || 'https://cp.cloudflare.com/generate_204';
 const MIHOMO_BIN = process.env.MIHOMO_PATH || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo');
@@ -46,7 +46,7 @@ console.log('📡 SubHub 边缘网络测速探针 (Edge Mihomo Probe Agent)');
 console.log(`🔗 目标云端地址: ${SUBHUB_URL || '(未指定)'}`);
 console.log(`🔑 探针密钥状态: ${AGENT_SECRET ? '已配置 (' + AGENT_SECRET.slice(0, 10) + '...)' : '❌ 未配置'}`);
 console.log(`⏱️ 测速周期: 每 ${INTERVAL_MINUTES} 分钟自动执行一次`);
-console.log(`⚡ 探测并发: ${CONCURRENCY} 线程 | 超时: ${TIMEOUT_MS}ms`);
+console.log(`⚡ 探测模式: 单并发顺序串行 | 超时: ${TIMEOUT_MS}ms`);
 console.log(`🎯 测速基准 URL: ${TEST_URL}`);
 console.log(`⚙️ 控制器端口: ${MIHOMO_PORT}`);
 console.log('====================================================');
@@ -312,38 +312,28 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
 }
 
 /**
- * 并发池执行测速
+ * 顺序串行执行测速（单并发，逐个节点测试，避免弱设备 CPU 排队抬高延迟）
  */
-async function batchTestNodes(nodes, concurrency = CONCURRENCY) {
+async function batchTestNodes(nodes) {
   const results = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < nodes.length) {
-      const currentIndex = index++;
-      const node = nodes[currentIndex];
-      try {
-        const { ping, status } = await testNodeDelay(node.name, TIMEOUT_MS);
-        results.push({
-          nodeId: node.id,
-          ping: ping >= 0 ? ping : null,
-          status,
-          checkedAt: new Date().toISOString(),
-        });
-      } catch {
-        results.push({
-          nodeId: node.id,
-          ping: null,
-          status: 'timeout',
-          checkedAt: new Date().toISOString(),
-        });
-      }
+  for (const node of nodes) {
+    try {
+      const { ping, status } = await testNodeDelay(node.name, TIMEOUT_MS);
+      results.push({
+        nodeId: node.id,
+        ping: ping >= 0 ? ping : null,
+        status,
+        checkedAt: new Date().toISOString(),
+      });
+    } catch {
+      results.push({
+        nodeId: node.id,
+        ping: null,
+        status: 'timeout',
+        checkedAt: new Date().toISOString(),
+      });
     }
   }
-
-  const workerCount = Math.max(1, Math.min(concurrency, nodes.length));
-  const workers = Array.from({ length: workerCount }, () => worker());
-  await Promise.all(workers);
   return results;
 }
 
@@ -403,11 +393,11 @@ async function runProbeCycle() {
     }
   }
 
-  console.log(`📦 成功拉取 ${nodes.length} 个节点，正在执行本地真实 URL-Test 并发探针 (${CONCURRENCY} 并发)...`);
+  console.log(`📦 成功拉取 ${nodes.length} 个节点，正在按顺序逐个执行真实 URL-Test 串行测速...`);
   const startTime = Date.now();
 
-  // 3. 并发测速
-  const pingResults = await batchTestNodes(nodes, CONCURRENCY);
+  // 3. 顺序串行测速（单并发）
+  const pingResults = await batchTestNodes(nodes);
   const durationMs = Date.now() - startTime;
 
   const onlineCount = pingResults.filter((r) => r.status === 'online').length;
