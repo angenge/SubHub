@@ -192,9 +192,11 @@ async function ensureMihomoRunning() {
   const initialConfig = `
 mixed-port: 0
 allow-lan: false
-mode: rule
+mode: direct
 log-level: silent
 external-controller: 127.0.0.1:${MIHOMO_PORT}
+dns:
+  enable: false
 proxies: []
 rules:
   - MATCH,DIRECT
@@ -205,8 +207,20 @@ rules:
 
   try {
     mihomoProcess = spawn(binPath, ['-d', PROBE_TMP_DIR, '-f', PROBE_CONFIG_PATH], {
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: false,
+    });
+
+    mihomoProcess.stdout.on('data', (d) => {
+      const msg = d.toString().trim();
+      if (process.env.DEBUG) console.log(`[Mihomo] ${msg}`);
+    });
+
+    mihomoProcess.stderr.on('data', (d) => {
+      const msg = d.toString().trim();
+      if (process.env.DEBUG || msg.includes('level=error') || msg.includes('level=fatal')) {
+        console.error(`[Mihomo Error] ${msg}`);
+      }
     });
 
     mihomoProcess.on('error', (err) => {
@@ -214,11 +228,18 @@ rules:
       cleanupAndExit(1);
     });
 
-    // 等待启动就绪 (最多等待 5 秒)
-    for (let i = 0; i < 25; i++) {
-      await new Promise((r) => setTimeout(r, 200));
+    mihomoProcess.on('exit', (code, signal) => {
+      if (code !== 0 && code !== null) {
+        console.error(`\n❌ Mihomo 进程意外退出 (code: ${code}, signal: ${signal})`);
+      }
+    });
+
+    // 等待启动就绪 (最多等待 15 秒，轮询间隔动态递增)
+    const maxRetries = 30;
+    for (let i = 0; i < maxRetries; i++) {
+      await new Promise((r) => setTimeout(r, 500));
       try {
-        const res = await fetch(`${MIHOMO_API}/version`, { signal: AbortSignal.timeout(500) });
+        const res = await fetch(`${MIHOMO_API}/version`, { signal: AbortSignal.timeout(1000) });
         if (res.ok) {
           const data = await res.json();
           console.log(`✅ Mihomo 内核就绪: version ${data.version || 'Meta'}`);
@@ -226,7 +247,7 @@ rules:
         }
       } catch {}
     }
-    throw new Error('Mihomo 启动超时，未能响应 API 请求');
+    throw new Error(`Mihomo 启动超时 (已等待 15s)，未能响应 ${MIHOMO_API}/version`);
   } catch (err) {
     console.error(`❌ 启动 Mihomo 失败: ${err.message}`);
     cleanupAndExit(1);
