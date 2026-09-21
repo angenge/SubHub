@@ -4,8 +4,9 @@ FROM node:20-alpine
 RUN apk add --no-cache curl gzip ca-certificates \
     && ARCH=$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/' | sed 's/armv7l/armv7/') \
     && MIHOMO_VER="v1.19.31" \
+    && MIHOMO_URL="https://dl.hiz.one/https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-${ARCH}-${MIHOMO_VER}.gz" \
     && echo "Downloading Mihomo ${MIHOMO_VER} for ${ARCH}..." \
-    && (curl -fsSL "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-${ARCH}-${MIHOMO_VER}.gz" || curl -fsSL "https://ghfast.top/https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-${ARCH}-${MIHOMO_VER}.gz") | gzip -d > /usr/local/bin/mihomo \
+    && (curl -fsSL "${MIHOMO_URL}" || curl -fsSL "https://github.com/MetaCubeX/mihomo/releases/download/${MIHOMO_VER}/mihomo-linux-${ARCH}-${MIHOMO_VER}.gz") | gzip -d > /usr/local/bin/mihomo \
     && chmod +x /usr/local/bin/mihomo \
     && mihomo -v
 

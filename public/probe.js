@@ -132,6 +132,7 @@ async function resolveMihomoBinary() {
   console.log(`📥 未在本地检测到 Mihomo 内核，正在自动下载适配 [${osType}/${arch}] 的稳定内核...`);
 
   const mirrors = [
+    `https://dl.hiz.one/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://ghfast.top/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://ghproxy.net/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
