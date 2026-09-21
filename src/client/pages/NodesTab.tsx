@@ -286,7 +286,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </span>
           {[
             { id: 'all', label: `全部 (${activeNodes.length})` },
-            { id: 'online', label: '🟢 在线' },
+            { id: 'online', label: '🟢 正常' },
             { id: 'slow', label: '🟡 缓慢' },
             { id: 'timeout', label: '🔴 超时' },
             { id: 'unknown', label: '⚪ 未测' },
