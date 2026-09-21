@@ -90,7 +90,7 @@ async function getSelectorState() {
 
 async function measureSpeed(timeoutSec = PROBE_TIMEOUT_SEC): Promise<{ ok: boolean; mbps: number; err: string }> {
   const args = [
-    '-sS',
+    '-sSL',
     '--max-time',
     String(timeoutSec),
     '-o',
@@ -166,6 +166,7 @@ async function tick() {
       holdUntil = now + SWITCH_WINDOW_MS;
       return;
     }
+    let switchedSuccess = false;
     for (const tag of list) {
       if (DRY_RUN) {
         log(`dry-run: would switch to '${tag}' and validate`);
@@ -173,21 +174,23 @@ async function tick() {
       }
       try {
         await switchTo(tag);
-        switchTimes.push(now);
         log(`switched to '${tag}'`);
         const pr = await measureSpeed(FAILOVER_TIMEOUT_SEC);
         if (pr.ok && pr.mbps >= MIN_MBPS) {
+          switchTimes.push(Date.now());
           log(`'${tag}' ok ${pr.mbps.toFixed(1)}Mbps => stay`);
+          switchedSuccess = true;
           return;
         }
-        badNodes.set(tag, now);
+        badNodes.set(tag, Date.now());
         log(`'${tag}' failed (${pr.ok ? pr.mbps.toFixed(1) + 'Mbps' : pr.err})`);
       } catch (e: any) {
-        badNodes.set(tag, now);
+        badNodes.set(tag, Date.now());
         log(`switch to '${tag}' failed: ${e.message}`);
       }
     }
-    if (!DRY_RUN) {
+    if (!DRY_RUN && !switchedSuccess) {
+      await switchTo(active).catch(() => {});
       log('ALL_CANDIDATES_FAILED => keep current selection, hold');
       holdUntil = Date.now() + SWITCH_WINDOW_MS;
     }
@@ -204,8 +207,8 @@ log(`start host=${CLASH_HOST} selector='${SELECTOR}' proxy=${PROXY} min=${MIN_MB
 await tick();
 if (DRY_RUN || MAX_TICKS === 1) process.exit(0);
 let cycles = 1;
-setInterval(() => {
-  tick();
+setInterval(async () => {
+  await tick();
   cycles += 1;
   if (MAX_TICKS > 0 && cycles >= MAX_TICKS) process.exit(0);
 }, INTERVAL_SEC * 1000);

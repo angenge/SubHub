@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { getAllNodes, batchUpdatePingResults } from './nodeService.js';
 import { PingResult } from '../../core/types/index.js';
+import { generateClashConfig } from '../../core/converters/toClash.js';
 import crypto from 'crypto';
 
 export interface AgentConfig {
@@ -93,15 +94,27 @@ export async function getAgentConfig(): Promise<AgentConfig> {
 export async function getAgentNodes() {
   // Only return active/non-disabled subscription nodes to the probe
   const nodes = await getAllNodes(undefined, false);
-  return nodes.map((n) => ({
-    id: n.id,
-    name: n.name,
-    type: n.type,
-    server: n.server,
-    port: n.port,
-    country: n.country,
-    countryCode: n.countryCode,
+
+  // 为避免节点重名导致 Clash 覆盖，为每个节点生成唯一的名称前缀标识
+  const mappedNodes = nodes.map((n) => ({
+    ...n,
+    name: `[${n.id}] ${(n.name || `${n.server}:${n.port}`).trim()}`,
   }));
+
+  const clashConfig = generateClashConfig(mappedNodes);
+
+  return {
+    clashConfig,
+    nodes: mappedNodes.map((n) => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      server: n.server,
+      port: n.port,
+      country: n.country,
+      countryCode: n.countryCode,
+    })),
+  };
 }
 
 export async function processAgentReport(results: PingResult[], clientIp: string) {

@@ -79,8 +79,8 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
   const origin = window.location.origin;
   const secret = config?.secret || '********************************';
 
-  const nodeCommand = `SUBHUB_URL="${origin}" AGENT_SECRET="${secret}" node probe.js`;
-  const dockerCommand = `docker run -d --name subhub-probe --restart unless-stopped -e SUBHUB_URL="${origin}" -e AGENT_SECRET="${secret}" -e INTERVAL_MINUTES=15 node:20-alpine sh -c "wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js && node probe.js"`;
+  const nodeCommand = `curl -fsSL ${origin}/probe.js -o probe.js && SUBHUB_URL="${origin}" AGENT_SECRET="${secret}" node probe.js`;
+  const dockerCommand = `docker run -d --name subhub-probe --restart unless-stopped -e SUBHUB_URL="${origin}" -e AGENT_SECRET="${secret}" -e INTERVAL_MINUTES=15 node:20-alpine sh -c "wget -qO probe.js ${origin}/probe.js || wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js; node probe.js"`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
@@ -215,7 +215,7 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
               <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
                 <span className="flex items-center gap-1.5">
                   <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>方式一：Node.js 单文件运行（免安装第三方库，开箱即用）</span>
+                  <span>方式一：Node.js 本地单文件运行（全自动装载 Mihomo 内核，开箱即用）</span>
                 </span>
                 <button
                   type="button"
@@ -236,7 +236,7 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
               <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
                 <span className="flex items-center gap-1.5">
                   <Server className="w-3.5 h-3.5 text-sky-400" />
-                  <span>方式二：Docker 后台常驻运行（适合软路由 / NAS）</span>
+                  <span>方式二：Docker 一键全自动常驻（自动装载 Mihomo 内核，适合 NAS / 软路由）</span>
                 </span>
                 <button
                   type="button"
