@@ -102,23 +102,49 @@ export async function getAgentNodes() {
     name: `[${n.id}] ${(n.name || `${n.server}:${n.port}`).trim()}`,
   }));
 
-  // 生成专供探针 URL-Test 的精简纯粹配置（不含任何 GeoIP/MMDB/fake-ip 依赖，秒级加载防卡顿）
-  const proxyList = mappedNodes.map(convertToClashProxyObject);
+  // 生成专供探针 URL-Test 的精简且高性能配置（开启 DoH、并发拨号与证书放宽）
+  const proxyList = mappedNodes.map((n) => {
+    const obj = convertToClashProxyObject(n);
+    // 探针测速环境下默认放宽证书校验，防止因容器 CA 缺失或自签证书被误杀
+    if (obj['skip-cert-verify'] === undefined) {
+      obj['skip-cert-verify'] = true;
+    }
+    return obj;
+  });
+
   const probeClashConfig = YAML.stringify({
     'mixed-port': 0,
     'allow-lan': false,
     mode: 'direct',
     'log-level': 'silent',
+    'tcp-concurrent': true,
+    'find-process-mode': 'off',
+    'global-client-fingerprint': 'chrome',
     'external-controller': '127.0.0.1:9090',
     dns: {
       enable: true,
       ipv6: false,
       'enhanced-mode': 'redir-host',
-      nameserver: [
+      'use-hosts': true,
+      'use-system-hosts': true,
+      'respect-rules': false,
+      'default-nameserver': [
         '223.5.5.5',
         '119.29.29.29',
-        '1.1.1.1',
-        '8.8.8.8',
+        '180.184.1.1',
+      ],
+      nameserver: [
+        'https://223.5.5.5/dns-query',
+        'https://doh.pub/dns-query',
+        'https://dns.alidns.com/dns-query',
+        '223.5.5.5',
+        '119.29.29.29',
+      ],
+      'proxy-server-nameserver': [
+        'https://223.5.5.5/dns-query',
+        'https://doh.pub/dns-query',
+        '223.5.5.5',
+        '119.29.29.29',
       ],
     },
     proxies: proxyList,
