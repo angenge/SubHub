@@ -85,12 +85,14 @@ subRouter.get('/:token', async (c) => {
         : subs.map((s: any) => s.id)
     );
 
+    const nowSec = Math.floor(Date.now() / 1000);
     for (const sub of subs) {
       if (!activeSubIds.has(sub.id)) continue;
       if (sub.upload) totalUpload += sub.upload;
       if (sub.download) totalDownload += sub.download;
       if (sub.total) totalQuota += sub.total;
-      if (sub.expire && sub.expire > 0) {
+      // For expiration, consider only active non-expired subscriptions to avoid falsely marking the whole aggregate as expired
+      if (sub.expire && sub.expire > nowSec) {
         if (minExpire === 0 || sub.expire < minExpire) {
           minExpire = sub.expire;
         }

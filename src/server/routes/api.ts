@@ -278,7 +278,8 @@ api.post('/subscriptions/:id/refresh', async (c) => {
 api.post('/subscriptions/refresh-all', async (c) => {
   try {
     const subs = await getAllSubscriptions();
-    const tasks = subs.map(async (sub: any) => {
+    const activeSubs = subs.filter((s: any) => s.status !== 'disabled');
+    const tasks = activeSubs.map(async (sub: any) => {
       try {
         const res = await refreshSubscription(sub.id, 'manual');
         return { id: sub.id, name: sub.name, success: true, nodeCount: res?.nodeCount || 0, data: res };

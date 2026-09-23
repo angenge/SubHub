@@ -171,26 +171,27 @@ export const App: React.FC = () => {
   };
 
   const handleRefreshAll = async () => {
-    if (subscriptions.length === 0) {
-      showToast('暂无订阅源可同步');
+    const targetSubs = subscriptions.filter((s) => s.status !== 'disabled');
+    if (targetSubs.length === 0) {
+      showToast(subscriptions.length === 0 ? '暂无订阅源可同步' : '暂无已启用的订阅源可同步');
       return;
     }
 
     setIsRefreshingAll(true);
     setIsSyncModalOpen(true);
 
-    const initialLogs: SyncItemLog[] = subscriptions.map((s) => ({
+    const initialLogs: SyncItemLog[] = targetSubs.map((s) => ({
       id: s.id,
       name: s.name,
       status: 'pending',
     }));
 
     const progressState: SyncProgressState = {
-      total: subscriptions.length,
+      total: targetSubs.length,
       completed: 0,
       successCount: 0,
       errorCount: 0,
-      activeName: subscriptions[0]?.name,
+      activeName: targetSubs[0]?.name,
       logs: initialLogs,
       isFinished: false,
     };
@@ -207,16 +208,16 @@ export const App: React.FC = () => {
 
     await new Promise<void>((resolve) => {
       const next = () => {
-        if (completedCount >= subscriptions.length) {
+        if (completedCount >= targetSubs.length) {
           progressState.isFinished = true;
           progressState.activeName = undefined;
           setSyncProgress({ ...progressState });
           return resolve();
         }
 
-        while (active < concurrency && index < subscriptions.length) {
+        while (active < concurrency && index < targetSubs.length) {
           const currentIndex = index++;
-          const sub = subscriptions[currentIndex];
+          const sub = targetSubs[currentIndex];
           active++;
 
           // Mark item running

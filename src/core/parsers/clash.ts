@@ -63,6 +63,12 @@ export function parseClashConfigDetailed(content: string): ClashParseResult {
         baseNode.tls = !!p.tls;
         baseNode.sni = p.servername || p.sni;
         baseNode.skipCertVerify = p['skip-cert-verify'];
+        if (p['client-fingerprint'] || p.fingerprint) {
+          baseNode.fingerprint = p['client-fingerprint'] || p.fingerprint;
+        }
+        if (p.alpn) {
+          baseNode.alpn = Array.isArray(p.alpn) ? p.alpn : [p.alpn];
+        }
 
         if (p['ws-opts']) {
           baseNode.wsOpts = {
@@ -83,11 +89,18 @@ export function parseClashConfigDetailed(content: string): ClashParseResult {
         baseNode.tls = !!p.tls;
         baseNode.sni = p.servername || p.sni;
         baseNode.skipCertVerify = p['skip-cert-verify'];
+        if (p['client-fingerprint'] || p.fingerprint) {
+          baseNode.fingerprint = p['client-fingerprint'] || p.fingerprint;
+        }
+        if (p.alpn) {
+          baseNode.alpn = Array.isArray(p.alpn) ? p.alpn : [p.alpn];
+        }
 
         if (p['reality-opts']) {
           baseNode.reality = {
             publicKey: p['reality-opts']['public-key'],
             shortId: p['reality-opts']['short-id'],
+            spiderX: p['reality-opts']['spider-x'],
           };
         }
         if (p['ws-opts']) {
@@ -108,10 +121,21 @@ export function parseClashConfigDetailed(content: string): ClashParseResult {
         baseNode.tls = true;
         baseNode.sni = p.sni || p.servername || p.server;
         baseNode.skipCertVerify = p['skip-cert-verify'];
+        if (p['client-fingerprint'] || p.fingerprint) {
+          baseNode.fingerprint = p['client-fingerprint'] || p.fingerprint;
+        }
+        if (p.alpn) {
+          baseNode.alpn = Array.isArray(p.alpn) ? p.alpn : [p.alpn];
+        }
         if (p['ws-opts']) {
           baseNode.wsOpts = {
             path: p['ws-opts'].path,
             headers: p['ws-opts'].headers,
+          };
+        }
+        if (p['grpc-opts']) {
+          baseNode.grpcOpts = {
+            serviceName: p['grpc-opts']['grpc-service-name'],
           };
         }
         nodes.push(baseNode);
@@ -119,8 +143,11 @@ export function parseClashConfigDetailed(content: string): ClashParseResult {
         baseNode.type = 'hysteria2';
         baseNode.password = p.password || p.auth;
         baseNode.tls = true;
-        baseNode.sni = p.sni;
+        baseNode.sni = p.sni || p.servername;
         baseNode.skipCertVerify = p['skip-cert-verify'];
+        if (p.alpn) {
+          baseNode.alpn = Array.isArray(p.alpn) ? p.alpn : [p.alpn];
+        }
         baseNode.hy2Opts = {
           auth: p.password || p.auth,
           upMbps: p.up,

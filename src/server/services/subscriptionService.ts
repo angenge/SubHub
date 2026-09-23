@@ -456,7 +456,7 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
         download: result.userinfo?.download ?? sub.download,
         total: result.userinfo?.total ?? sub.total,
         expire: result.userinfo?.expire ?? sub.expire,
-        status: 'active',
+        status: sub.status === 'disabled' ? 'disabled' : 'active',
         errorMessage: null,
         updatedAt: now,
       }).where(eq(schema.subscriptions.id, id));
@@ -476,7 +476,12 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
     }
 
     // 200 OK: New nodes fetched
+    // Safety check: if fetch returned 0 nodes but previously had nodes, don't wipe them out unless it's explicitly intentional
     const previousCount = sub.nodeCount || 0;
+    if (result.nodes.length === 0 && previousCount > 0) {
+      throw new Error(`Fetched 0 nodes from upstream, preserving existing ${previousCount} nodes`);
+    }
+
     await saveSubscriptionNodes(id, result.nodes);
 
     await db.update(schema.subscriptions).set({
@@ -488,7 +493,7 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
       nodeCount: result.nodes.length,
       etag: result.etag || undefined,
       lastModified: result.lastModified || undefined,
-      status: 'active',
+      status: sub.status === 'disabled' ? 'disabled' : 'active',
       errorMessage: null,
       updatedAt: now,
     }).where(eq(schema.subscriptions.id, id));
@@ -519,7 +524,7 @@ export async function refreshSubscription(id: string, triggerType: 'manual' | 'c
     durationMs = Date.now() - startTime;
     // Graceful fallback on failure: KEEP existing cached nodes in DB!
     await db.update(schema.subscriptions).set({
-      status: 'error',
+      status: sub.status === 'disabled' ? 'disabled' : 'error',
       errorMessage: err.message || 'Refresh failed',
       updatedAt: now,
     }).where(eq(schema.subscriptions.id, id));

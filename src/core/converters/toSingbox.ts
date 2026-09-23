@@ -196,7 +196,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       type: 'urltest',
       tag: '节点探针',
       outbounds: fallbackTags,
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: 'http://cp.cloudflare.com/generate_204',
       interval: testInterval,
       tolerance: testTolerance,
     },

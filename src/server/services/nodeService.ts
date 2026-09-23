@@ -27,6 +27,7 @@ export function parseDbNode(raw: any): ProxyNode {
     tls: !!raw.tls,
     sni: raw.sni || undefined,
     alpn: raw.alpn ? JSON.parse(raw.alpn) : undefined,
+    fingerprint: extra.fingerprint || undefined,
     skipCertVerify: !!raw.skipCertVerify,
     flow: raw.flow || undefined,
     reality: raw.reality ? JSON.parse(raw.reality) : undefined,

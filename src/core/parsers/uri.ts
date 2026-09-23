@@ -34,7 +34,7 @@ export function parseVlessUri(uri: string): ProxyNode | null {
     const url = new URL(uri);
     const uuid = url.username;
     const server = url.hostname;
-    const port = parseInt(url.port, 10);
+    const port = parseInt(url.port || '443', 10);
     if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
 
     const name = decodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
@@ -160,7 +160,7 @@ export function parseTrojanUri(uri: string): ProxyNode | null {
     const url = new URL(uri);
     const password = decodeURIComponent(url.username);
     const server = url.hostname;
-    const port = parseInt(url.port, 10);
+    const port = parseInt(url.port || '443', 10);
     if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
 
     const name = decodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);

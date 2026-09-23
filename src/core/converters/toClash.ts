@@ -26,6 +26,8 @@ export function convertToClashProxyObject(node: ProxyNode): any {
     base.network = node.network || 'tcp';
     base.tls = !!node.tls;
     if (node.sni) base.servername = node.sni;
+    if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+    if (node.alpn) base.alpn = node.alpn;
     if (node.skipCertVerify) base['skip-cert-verify'] = true;
     if (node.wsOpts) {
       base['ws-opts'] = {
@@ -45,6 +47,7 @@ export function convertToClashProxyObject(node: ProxyNode): any {
     base.tls = !!node.tls;
     if (node.sni) base.servername = node.sni;
     if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+    if (node.alpn) base.alpn = node.alpn;
     if (node.skipCertVerify) base['skip-cert-verify'] = true;
     if (node.reality) {
       base['reality-opts'] = {
@@ -69,6 +72,7 @@ export function convertToClashProxyObject(node: ProxyNode): any {
     base.network = node.network || 'tcp';
     base.tls = true;
     if (node.sni) base.sni = node.sni;
+    if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
     if (node.skipCertVerify) base['skip-cert-verify'] = true;
     if (node.alpn) base.alpn = node.alpn;
     if (node.wsOpts) {
@@ -87,6 +91,7 @@ export function convertToClashProxyObject(node: ProxyNode): any {
     base.tls = true;
     if (node.sni) base.sni = node.sni;
     if (node.skipCertVerify) base['skip-cert-verify'] = true;
+    if (node.alpn) base.alpn = node.alpn;
     if (node.hy2Opts?.upMbps) base.up = node.hy2Opts.upMbps;
     if (node.hy2Opts?.downMbps) base.down = node.hy2Opts.downMbps;
     if (node.hy2Opts?.obfs) {
@@ -138,6 +143,8 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     ? ['自动选择', '故障转移', ...proxyNames, 'DIRECT']
     : ['DIRECT'];
 
+  const testUrl = 'http://cp.cloudflare.com/generate_204';
+
   const proxyGroups: any[] = [
     {
       name: '节点选择',
@@ -147,7 +154,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     {
       name: '自动选择',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       tolerance: 50,
       proxies: fallbackProxy,
@@ -155,7 +162,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     {
       name: '故障转移',
       type: 'fallback',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: fallbackProxy,
     },
@@ -165,7 +172,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     proxyGroups.push({
       name: '香港节点',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: hkNodes,
     });
@@ -174,7 +181,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     proxyGroups.push({
       name: '日本节点',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: jpNodes,
     });
@@ -183,7 +190,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     proxyGroups.push({
       name: '美国节点',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: usNodes,
     });
@@ -192,7 +199,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     proxyGroups.push({
       name: '新加坡节点',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: sgNodes,
     });
@@ -201,7 +208,7 @@ export function generateClashConfig(nodes: ProxyNode[], options: { template?: st
     proxyGroups.push({
       name: '台湾节点',
       type: 'url-test',
-      url: 'https://cp.cloudflare.com/generate_204',
+      url: testUrl,
       interval: 300,
       proxies: twNodes,
     });

@@ -61,11 +61,28 @@ export function ensureUniqueNodeNames(nodes: ProxyNode[]): ProxyNode[] {
   });
 }
 
+const DUMMY_SERVERS = new Set([
+  '1.1.1.1',
+  '1.0.0.1',
+  '8.8.8.8',
+  '8.8.4.4',
+  '127.0.0.1',
+  '0.0.0.0',
+  'localhost',
+]);
+
 export function processAggregateNodes(
   allNodes: ProxyNode[],
   group: AggregateGroup
 ): ProxyNode[] {
   let result = [...allNodes];
+
+  // 0. Filter out informational/dummy announcement nodes
+  result = result.filter((n) => {
+    if (n.country === '提示' || n.countryCode === 'INFO') return false;
+    if (n.server && DUMMY_SERVERS.has(n.server.trim().toLowerCase())) return false;
+    return true;
+  });
 
   // 1. Filter by Subscription ID
   if (group.subscriptionIds && group.subscriptionIds.length > 0) {
