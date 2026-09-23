@@ -199,10 +199,10 @@ docker run -d \
   -e SUBHUB_URL="https://your-subhub-domain.com" \
   -e AGENT_SECRET="subprobe_your_secret_here" \
   -e INTERVAL_MINUTES=15 \
-  node:20-alpine sh -c "wget -qO probe.js https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js && node probe.js"
+  node:20-alpine sh -c "wget -qO probe.js https://your-subhub-domain.com/probe.js && node probe.js"
 
 # 方式 2：Node.js 单文件直接运行 (0 外部 npm 依赖)
-curl -fsSL https://raw.githubusercontent.com/angenge/SubHub/main/agent/probe.js -o probe.js
+curl -fsSL https://your-subhub-domain.com/probe.js -o probe.js
 SUBHUB_URL="https://your-subhub-domain.com" AGENT_SECRET="subprobe_your_secret_here" node probe.js
 ```
 
