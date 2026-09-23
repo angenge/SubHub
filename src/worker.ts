@@ -38,7 +38,25 @@ app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString(),
 // Static Assets fallback (Workers Static Assets)
 app.all('*', async (c) => {
   if (c.env?.ASSETS) {
-    return c.env.ASSETS.fetch(c.req.raw);
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    const contentType = res.headers.get('content-type');
+    // Ensure charset=utf-8 is set for text/script assets to prevent browser mojibake (garbled Chinese characters)
+    if (
+      contentType &&
+      !contentType.includes('charset=') &&
+      (contentType.includes('javascript') ||
+        contentType.includes('text/') ||
+        contentType.includes('application/json'))
+    ) {
+      const newHeaders = new Headers(res.headers);
+      newHeaders.set('content-type', `${contentType}; charset=utf-8`);
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: newHeaders,
+      });
+    }
+    return res;
   }
   return c.text('Not Found', 404);
 });
