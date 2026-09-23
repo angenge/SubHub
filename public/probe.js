@@ -7,17 +7,17 @@
  * 内嵌或对接 Mihomo (Clash.Meta) 内核，对全协议代理节点（包括 Hysteria2、TUIC、VLESS Reality 等）
  * 执行真实 URL-Test 测速并将准确的全链路延迟与存活状态回传云端落库。
  *
- * 无需任何外部 npm 依赖，基于 Node.js 原生模块构建。
+ * 无需任何外部 npm 依赖，零配置开箱即用。
  */
 
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
-import zlib from 'node:zlib';
-import stream from 'node:stream';
-import util from 'node:util';
-import { spawn, execSync } from 'node:child_process';
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const zlib = require('node:zlib');
+const stream = require('node:stream');
+const util = require('node:util');
+const { spawn, execSync } = require('node:child_process');
 
 const streamPipeline = util.promisify(stream.pipeline);
 
@@ -29,7 +29,7 @@ if (process.stdout._handle && process.stdout._handle.setBlocking) {
 const SUBHUB_URL = (process.env.SUBHUB_URL || process.argv[2] || '').replace(/\/+$/, '');
 const AGENT_SECRET = (process.env.AGENT_SECRET || process.argv[3] || '').trim();
 const INTERVAL_MINUTES = parseInt(process.env.INTERVAL_MINUTES || '15', 10);
-const CONCURRENCY = parseInt(process.env.CONCURRENCY || '1', 10);
+const CONCURRENCY = Math.max(1, parseInt(process.env.CONCURRENCY || '3', 10));
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '8000', 10);
 const TEST_URL = process.env.TEST_URL || 'https://cp.cloudflare.com/generate_204';
 const MIHOMO_BIN = process.env.MIHOMO_PATH || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo');
@@ -40,13 +40,14 @@ const PROBE_TMP_DIR = path.join(os.tmpdir(), 'subhub_probe');
 const PROBE_CONFIG_PATH = path.join(PROBE_TMP_DIR, 'config.yaml');
 
 let mihomoProcess = null;
+let isCycleRunning = false;
 
 console.log('====================================================');
 console.log('📡 SubHub 边缘网络测速探针 (Edge Mihomo Probe Agent)');
 console.log(`🔗 目标云端地址: ${SUBHUB_URL || '(未指定)'}`);
 console.log(`🔑 探针密钥状态: ${AGENT_SECRET ? '已配置 (' + AGENT_SECRET.slice(0, 10) + '...)' : '❌ 未配置'}`);
 console.log(`⏱️ 测速周期: 每 ${INTERVAL_MINUTES} 分钟自动执行一次`);
-console.log(`⚡ 探测模式: 单并发顺序串行 | 超时: ${TIMEOUT_MS}ms`);
+console.log(`⚡ 探测模式: 受控并发池 (${CONCURRENCY} 并发) | 超时: ${TIMEOUT_MS}ms`);
 console.log(`🎯 测速基准 URL: ${TEST_URL}`);
 console.log(`⚙️ 控制器端口: ${MIHOMO_PORT}`);
 console.log('====================================================');
@@ -139,8 +140,8 @@ async function resolveMihomoBinary() {
 
   const mirrors = [
     `https://dl.hiz.one/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
-    `https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://ghfast.top/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
+    `https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://ghproxy.net/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
   ];
 
@@ -292,15 +293,44 @@ let apiErrorLogged = false;
 let currentCycleApiErrors = 0;
 
 /**
+ * 判断是否为非代理提示类节点/规则项
+ */
+function isNoticeOrRuleNode(name) {
+  if (!name) return true;
+  const lower = name.toLowerCase();
+  if (name === 'PASS-RULE' || name === 'REJECT-DROP' || name === 'DIRECT' || name === 'REJECT' || name === 'GLOBAL') {
+    return true;
+  }
+  if (lower.includes('剩余流量') || lower.includes('套餐到期') || lower.includes('重置剩余') || lower.includes('官网') || lower.includes('不再支持')) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * 通过 Mihomo 官方 URL-Test 接口单节点测速
  */
 async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
+  if (isNoticeOrRuleNode(nodeName)) {
+    return { ping: -1, status: 'ignored' };
+  }
+
   const url = `${MIHOMO_API}/proxies/${encodeURIComponent(nodeName)}/delay?timeout=${timeoutMs}&url=${encodeURIComponent(TEST_URL)}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs + 2000) });
+    
+    // 区分节点在内核中不存在 (404) 与真实超时 (504/网络断开)
+    if (res.status === 404) {
+      if (process.env.DEBUG) {
+        console.warn(`[Probe] 节点未在内核中找到 (404): ${nodeName}`);
+      }
+      return { ping: -1, status: 'not_found' };
+    }
+
     if (!res.ok) {
       return { ping: -1, status: 'timeout' };
     }
+
     const data = await res.json();
     const delay = typeof data.delay === 'number' ? data.delay : -1;
 
@@ -324,28 +354,40 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
 }
 
 /**
- * 顺序串行执行测速（单并发，逐个节点测试，避免弱设备 CPU 排队抬高延迟）
+ * 受控并发池执行测速 (默认 3 并发，兼顾吞吐效率与网络稳定性)
  */
 async function batchTestNodes(nodes) {
-  const results = [];
-  for (const node of nodes) {
-    try {
-      const { ping, status } = await testNodeDelay(node.name, TIMEOUT_MS);
-      results.push({
-        nodeId: node.id,
-        ping: ping >= 0 ? ping : null,
-        status,
-        checkedAt: new Date().toISOString(),
-      });
-    } catch {
-      results.push({
-        nodeId: node.id,
-        ping: null,
-        status: 'timeout',
-        checkedAt: new Date().toISOString(),
-      });
+  const results = new Array(nodes.length);
+  let currentIndex = 0;
+  const workerCount = Math.min(CONCURRENCY, nodes.length || 1);
+
+  async function worker() {
+    while (true) {
+      const idx = currentIndex++;
+      if (idx >= nodes.length) break;
+      const node = nodes[idx];
+
+      try {
+        const { ping, status } = await testNodeDelay(node.name, TIMEOUT_MS);
+        results[idx] = {
+          nodeId: node.id,
+          ping: ping >= 0 ? ping : null,
+          status: status === 'not_found' ? 'timeout' : status,
+          checkedAt: new Date().toISOString(),
+        };
+      } catch {
+        results[idx] = {
+          nodeId: node.id,
+          ping: null,
+          status: 'timeout',
+          checkedAt: new Date().toISOString(),
+        };
+      }
     }
   }
+
+  const workers = Array.from({ length: workerCount }, () => worker());
+  await Promise.all(workers);
   return results;
 }
 
@@ -353,106 +395,135 @@ async function batchTestNodes(nodes) {
  * 执行单次拉取 ➔ 测速 ➔ 上报流程
  */
 async function runProbeCycle() {
+  if (isCycleRunning) {
+    console.warn('⚠️ 上一轮探测任务仍在执行中，跳过本次调度以防重叠竞态。');
+    return;
+  }
+
+  isCycleRunning = true;
   const nowStr = new Date().toLocaleString();
   console.log(`\n[${nowStr}] 🚀 正在连接云端拉取待测节点...`);
 
-  // 1. 获取待测节点列表及 Clash 格式配置
-  let nodes = [];
-  let clashConfig = '';
   try {
-    const res = await fetch(`${SUBHUB_URL}/api/agent/nodes`, {
-      headers: {
-        'Authorization': `Bearer ${AGENT_SECRET}`,
-        'User-Agent': 'SubHub-Probe-Agent/2.0',
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`HTTP ${res.status}: ${errText}`);
-    }
-
-    const json = await res.json();
-    if (!json.success || !json.data) {
-      throw new Error(json.message || '获取节点数据异常');
-    }
-
-    // 兼容数组（旧协议）与对象格式（新协议）
-    if (Array.isArray(json.data)) {
-      nodes = json.data;
-    } else {
-      nodes = json.data.nodes || [];
-      clashConfig = json.data.clashConfig || '';
-    }
-  } catch (err) {
-    console.error(`❌ 拉取失败: ${err.message}`);
-    return;
-  }
-
-  if (nodes.length === 0) {
-    console.log('ℹ️ 当前暂无可用待测节点（或所有订阅源均处于禁用状态）。');
-    return;
-  }
-
-  // 2. 将配置热加载到 Mihomo 内核
-  if (clashConfig) {
+    // 1. 获取待测节点列表及 Clash 格式配置
+    let nodes = [];
+    let clashConfig = '';
     try {
-      await reloadMihomoConfig(clashConfig);
+      const res = await fetch(`${SUBHUB_URL}/api/agent/nodes`, {
+        headers: {
+          'Authorization': `Bearer ${AGENT_SECRET}`,
+          'User-Agent': 'SubHub-Probe-Agent/2.0',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
+
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.message || '获取节点数据异常');
+      }
+
+      // 兼容数组（旧协议）与对象格式（新协议）
+      if (Array.isArray(json.data)) {
+        nodes = json.data;
+      } else {
+        nodes = json.data.nodes || [];
+        clashConfig = json.data.clashConfig || '';
+      }
     } catch (err) {
-      console.error(`❌ 加载配置到 Mihomo 失败: ${err.message}`);
+      console.error(`❌ 拉取失败: ${err.message}`);
       return;
     }
-  }
 
-  console.log(`📦 成功拉取 ${nodes.length} 个节点，正在按顺序逐个执行真实 URL-Test 串行测速...`);
-  const startTime = Date.now();
-
-  // 3. 顺序串行测速（单并发）
-  currentCycleApiErrors = 0;
-  const pingResults = await batchTestNodes(nodes);
-  const durationMs = Date.now() - startTime;
-
-  if (currentCycleApiErrors >= nodes.length && nodes.length > 0) {
-    console.error(`⚠️ 本轮测速本地 Mihomo 控制器全无响应 (${currentCycleApiErrors}/${nodes.length})，跳过上报以防误写节点为超时。`);
-    apiErrorLogged = false;
-    return;
-  }
-
-  const onlineCount = pingResults.filter((r) => r.status === 'online').length;
-  const slowCount = pingResults.filter((r) => r.status === 'slow').length;
-  const timeoutCount = pingResults.filter((r) => r.status === 'timeout').length;
-
-  console.log(`⚡ 本地 URL-Test 完成 (耗时 ${(durationMs / 1000).toFixed(1)}s): 🟢 极速可用 ${onlineCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}`);
-
-  // 4. 打包批量回传落库
-  console.log('📤 正在将测速与健康度结果上报至云端 SubHub...');
-  try {
-    const reportRes = await fetch(`${SUBHUB_URL}/api/agent/report`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AGENT_SECRET}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'SubHub-Probe-Agent/2.0',
-      },
-      body: JSON.stringify({ results: pingResults }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!reportRes.ok) {
-      const errText = await reportRes.text();
-      throw new Error(`HTTP ${reportRes.status}: ${errText}`);
+    if (nodes.length === 0) {
+      console.log('ℹ️ 当前暂无可用待测节点（或所有订阅源均处于禁用状态）。');
+      return;
     }
 
-    const reportJson = await reportRes.json();
-    if (!reportJson.success) {
-      throw new Error(reportJson.message || '上报结果保存失败');
+    // 2. 将配置热加载到 Mihomo 内核
+    if (clashConfig) {
+      try {
+        await reloadMihomoConfig(clashConfig);
+      } catch (err) {
+        console.error(`❌ 加载配置到 Mihomo 失败: ${err.message}`);
+        return;
+      }
     }
 
-    console.log(`✅ 同步成功！已更新 ${reportJson.data?.updatedCount || pingResults.length} 个节点的真实网络延迟。`);
-    console.log(`💤 进入休眠，将在 ${INTERVAL_MINUTES} 分钟后执行下一轮测速...\n`);
-  } catch (err) {
-    console.error(`❌ 上报失败: ${err.message}`);
+    console.log(`📦 成功拉取 ${nodes.length} 个节点，正在以 ${CONCURRENCY} 并发执行真实 URL-Test 测速...`);
+    const startTime = Date.now();
+
+    // 3. 受控并发测速
+    currentCycleApiErrors = 0;
+    const pingResults = await batchTestNodes(nodes);
+    const durationMs = Date.now() - startTime;
+
+    if (currentCycleApiErrors >= nodes.length && nodes.length > 0) {
+      console.error(`⚠️ 本轮测速本地 Mihomo 控制器全无响应 (${currentCycleApiErrors}/${nodes.length})，跳过上报以防误写节点为超时。`);
+      apiErrorLogged = false;
+      return;
+    }
+
+    const onlineCount = pingResults.filter((r) => r.status === 'online').length;
+    const slowCount = pingResults.filter((r) => r.status === 'slow').length;
+    const timeoutCount = pingResults.filter((r) => r.status === 'timeout').length;
+    const ignoredCount = pingResults.filter((r) => r.status === 'ignored').length;
+
+    console.log(`⚡ 本地 URL-Test 完成 (耗时 ${(durationMs / 1000).toFixed(1)}s): 🟢 极速可用 ${onlineCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}${ignoredCount > 0 ? ` | ⚪ 忽略提示项 ${ignoredCount}` : ''}`);
+
+    // 4. 打包批量回传落库 (过滤 ignored 提示项)
+    const reportList = pingResults.filter((r) => r.status !== 'ignored');
+    console.log(`📤 正在将 ${reportList.length} 条测速与健康度结果上报至云端 SubHub...`);
+    try {
+      const reportRes = await fetch(`${SUBHUB_URL}/api/agent/report`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AGENT_SECRET}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'SubHub-Probe-Agent/2.0',
+        },
+        body: JSON.stringify({ results: reportList }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!reportRes.ok) {
+        const errText = await reportRes.text();
+        throw new Error(`HTTP ${reportRes.status}: ${errText}`);
+      }
+
+      const reportJson = await reportRes.json();
+      if (!reportJson.success) {
+        throw new Error(reportJson.message || '上报结果保存失败');
+      }
+
+      console.log(`✅ 同步成功！已更新 ${reportJson.data?.updatedCount || reportList.length} 个节点的真实网络延迟。`);
+      console.log(`💤 进入休眠，将在 ${INTERVAL_MINUTES} 分钟后执行下一轮测速...\n`);
+    } catch (err) {
+      console.error(`❌ 上报失败: ${err.message}`);
+    }
+  } finally {
+    isCycleRunning = false;
+  }
+}
+
+/**
+ * 安全调度器（避免 setInterval 引起的重叠并发执行）
+ */
+function scheduleNextCycle() {
+  if (INTERVAL_MINUTES > 0) {
+    setTimeout(async () => {
+      try {
+        await runProbeCycle();
+      } catch (err) {
+        console.error('Probe Cycle Error:', err);
+      } finally {
+        scheduleNextCycle();
+      }
+    }, INTERVAL_MINUTES * 60 * 1000);
   }
 }
 
@@ -463,10 +534,8 @@ async function main() {
   // 立即执行首轮测速
   await runProbeCycle();
 
-  // 定时执行后续轮次
-  if (INTERVAL_MINUTES > 0) {
-    setInterval(runProbeCycle, INTERVAL_MINUTES * 60 * 1000);
-  }
+  // 启动安全递归调度
+  scheduleNextCycle();
 }
 
 main().catch((err) => {
