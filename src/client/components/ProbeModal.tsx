@@ -16,7 +16,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { getAgentConfig, rotateAgentSecret, AgentProbeConfig } from '../api/index.js';
-import { formatDate } from '../lib/utils.js';
+import { formatDate, copyToClipboard } from '../lib/utils.js';
 
 interface ProbeModalProps {
   isOpen: boolean;
@@ -54,8 +54,8 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
 
   if (!isOpen) return null;
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, field: string) => {
+    await copyToClipboard(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };

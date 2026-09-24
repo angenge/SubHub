@@ -336,8 +336,8 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
 
     if (delay <= 0) {
       return { ping: -1, status: 'timeout' };
-    } else if (delay < 450) {
-      return { ping: delay, status: 'online' };
+    } else if (delay <= 300) {
+      return { ping: delay, status: 'fast' };
     } else {
       return { ping: delay, status: 'slow' };
     }
@@ -468,12 +468,12 @@ async function runProbeCycle() {
       return;
     }
 
-    const onlineCount = pingResults.filter((r) => r.status === 'online').length;
+    const fastCount = pingResults.filter((r) => r.status === 'fast' || r.status === 'online').length;
     const slowCount = pingResults.filter((r) => r.status === 'slow').length;
     const timeoutCount = pingResults.filter((r) => r.status === 'timeout').length;
     const ignoredCount = pingResults.filter((r) => r.status === 'ignored').length;
 
-    console.log(`⚡ 本地 URL-Test 完成 (耗时 ${(durationMs / 1000).toFixed(1)}s): 🟢 极速可用 ${onlineCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}${ignoredCount > 0 ? ` | ⚪ 忽略提示项 ${ignoredCount}` : ''}`);
+    console.log(`⚡ 本地 URL-Test 完成 (耗时 ${(durationMs / 1000).toFixed(1)}s): 🟢 极速可用 ${fastCount} | 🟡 良好缓慢 ${slowCount} | 🔴 超时不可用 ${timeoutCount}${ignoredCount > 0 ? ` | ⚪ 忽略提示项 ${ignoredCount}` : ''}`);
 
     // 4. 打包批量回传落库 (过滤 ignored 提示项)
     const reportList = pingResults.filter((r) => r.status !== 'ignored');

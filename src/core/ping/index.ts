@@ -65,9 +65,9 @@ export async function pingNode(node: ProxyNode, timeoutMs = 2500): Promise<PingR
 
   const { ping, error } = await tcpPing(node.server, node.port, timeoutMs);
 
-  let status: 'online' | 'slow' | 'timeout' = 'timeout';
+  let status: 'fast' | 'slow' | 'timeout' = 'timeout';
   if (ping > 0) {
-    status = ping <= 300 ? 'online' : 'slow';
+    status = ping <= 300 ? 'fast' : 'slow';
   }
 
   return {

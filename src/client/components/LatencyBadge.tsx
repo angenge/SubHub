@@ -3,7 +3,7 @@ import { cn } from '../lib/utils.js';
 
 interface LatencyBadgeProps {
   ping?: number;
-  status?: 'online' | 'slow' | 'timeout' | 'unknown';
+  status?: 'fast' | 'slow' | 'timeout' | 'unknown' | 'online';
   size?: 'sm' | 'md';
 }
 
@@ -13,17 +13,13 @@ export const LatencyBadge: React.FC<LatencyBadgeProps> = ({ ping, status = 'unkn
   let text = '未测试';
 
   if (ping !== undefined && ping > 0) {
-    if (ping <= 180) {
+    if (ping <= 300) {
       color = 'bg-emerald-950/80 text-emerald-400 border-emerald-800/60';
       dotColor = 'bg-emerald-400';
       text = `${ping} ms`;
-    } else if (ping <= 350) {
+    } else {
       color = 'bg-amber-950/80 text-amber-400 border-amber-800/60';
       dotColor = 'bg-amber-400';
-      text = `${ping} ms`;
-    } else {
-      color = 'bg-orange-950/80 text-orange-400 border-orange-800/60';
-      dotColor = 'bg-orange-400';
       text = `${ping} ms`;
     }
   } else if (status === 'timeout' || ping === -1) {

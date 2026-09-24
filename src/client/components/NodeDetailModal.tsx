@@ -5,6 +5,7 @@ import { convertNodeToUri, convertToClashProxyObject, convertToSingboxOutbound }
 import YAML from 'yaml';
 import { CountryBadge } from './CountryBadge.js';
 import { LatencyBadge } from './LatencyBadge.js';
+import { copyToClipboard } from '../lib/utils.js';
 
 interface NodeDetailModalProps {
   isOpen: boolean;
@@ -23,8 +24,8 @@ export const NodeDetailModal: React.FC<NodeDetailModalProps> = ({ isOpen, onClos
   const singboxJson = JSON.stringify(convertToSingboxOutbound(node), null, 2);
   const fullJson = JSON.stringify(node, null, 2);
 
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, key: string) => {
+    await copyToClipboard(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
   };

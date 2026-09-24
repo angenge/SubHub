@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { AggregateGroup, Subscription } from '../../core/types/index.js';
 import { AuditLogModal } from '../components/AuditLogModal.js';
-import { formatDate } from '../lib/utils.js';
+import { formatDate, copyToClipboard } from '../lib/utils.js';
 
 interface AggregatesTabProps {
   aggregates: AggregateGroup[];
@@ -40,10 +40,10 @@ export const AggregatesTab: React.FC<AggregatesTabProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedAggForLogs, setSelectedAggForLogs] = useState<AggregateGroup | null>(null);
 
-  const handleQuickCopy = (agg: AggregateGroup) => {
+  const handleQuickCopy = async (agg: AggregateGroup) => {
     const origin = window.location.origin;
     const url = `${origin}/sub/${agg.token}`;
-    navigator.clipboard.writeText(url);
+    await copyToClipboard(url);
     setCopiedId(agg.id);
     setTimeout(() => setCopiedId(null), 2000);
   };

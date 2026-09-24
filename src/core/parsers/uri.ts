@@ -18,6 +18,25 @@ export function safeBase64Encode(str: string): string {
   return Buffer.from(str, 'utf-8').toString('base64');
 }
 
+export function safeDecodeURIComponent(str: string): string {
+  if (!str) return '';
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    try {
+      // Escape lone % symbols not followed by 2 hex digits
+      const sanitized = str.replace(/%(?![0-9a-fA-F]{2})/g, '%25');
+      return decodeURIComponent(sanitized);
+    } catch {
+      try {
+        return unescape(str);
+      } catch {
+        return str;
+      }
+    }
+  }
+}
+
 export function generateNodeId(server: string, port: number, type: string, name: string): string {
   const seed = `${type}:${(server || '').toLowerCase()}:${port}:${(name || '').trim()}`;
   let hash = 0;
@@ -37,7 +56,7 @@ export function parseVlessUri(uri: string): ProxyNode | null {
     const port = parseInt(url.port || '443', 10);
     if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
 
-    const name = decodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
+    const name = safeDecodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
     const params = url.searchParams;
 
     const security = params.get('security') || 'none';
@@ -158,12 +177,12 @@ export function parseVmessUri(uri: string): ProxyNode | null {
 export function parseTrojanUri(uri: string): ProxyNode | null {
   try {
     const url = new URL(uri);
-    const password = decodeURIComponent(url.username);
+    const password = safeDecodeURIComponent(url.username);
     const server = url.hostname;
     const port = parseInt(url.port || '443', 10);
     if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
 
-    const name = decodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
+    const name = safeDecodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
     const params = url.searchParams;
 
     const sni = params.get('sni') || params.get('peer') || server;
@@ -210,7 +229,7 @@ export function parseShadowsocksUri(uri: string): ProxyNode | null {
     const raw = uri.slice(5); // remove ss://
     const hashIndex = raw.indexOf('#');
     let encodedPart = hashIndex !== -1 ? raw.slice(0, hashIndex) : raw;
-    const name = hashIndex !== -1 ? decodeURIComponent(raw.slice(hashIndex + 1)) : '';
+    const name = hashIndex !== -1 ? safeDecodeURIComponent(raw.slice(hashIndex + 1)) : '';
 
     let server = '';
     let port = 0;
@@ -234,7 +253,7 @@ export function parseShadowsocksUri(uri: string): ProxyNode | null {
           const params = new URLSearchParams(queryStr);
           const rawPlugin = params.get('plugin');
           if (rawPlugin) {
-            const decodedPlugin = decodeURIComponent(rawPlugin);
+            const decodedPlugin = safeDecodeURIComponent(rawPlugin);
             const [pluginName, ...opts] = decodedPlugin.split(';');
             plugin = pluginName;
             pluginOpts = {};
@@ -322,11 +341,11 @@ export function parseHysteria2Uri(uri: string): ProxyNode | null {
   try {
     const cleanUri = uri.startsWith('hy2://') ? uri.replace('hy2://', 'hysteria2://') : uri;
     const url = new URL(cleanUri);
-    const password = decodeURIComponent(url.username || '');
+    const password = safeDecodeURIComponent(url.username || '');
     const server = url.hostname;
     const port = parseInt(url.port || '443', 10);
     if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
-    const name = decodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
+    const name = safeDecodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
     const params = url.searchParams;
 
     const sni = params.get('sni') || server;

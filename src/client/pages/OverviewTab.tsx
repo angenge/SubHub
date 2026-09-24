@@ -29,7 +29,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   if (!stats) return null;
 
-  const onlineRate = stats.totalNodes > 0 ? Math.round((stats.onlineNodes / stats.totalNodes) * 100) : 0;
+  const fastCount = stats.fastNodes ?? stats.onlineNodes ?? 0;
+  const slowCount = stats.slowNodes ?? 0;
+  const aliveNodes = stats.aliveNodes ?? (fastCount + slowCount);
+  const unknownNodes = stats.unknownNodes ?? Math.max(0, stats.totalNodes - (aliveNodes + stats.timeoutNodes));
+  const survivalRate = stats.totalNodes > 0 ? Math.round((aliveNodes / stats.totalNodes) * 100) : 0;
   const trafficPercent =
     stats.totalTrafficQuota > 0 ? Math.min(100, Math.round((stats.totalTrafficUsed / stats.totalTrafficQuota) * 100)) : 0;
 
@@ -48,8 +52,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
               已管理 <span className="font-semibold text-sky-400">{stats.totalSubscriptions}</span> 个订阅源，共收录{' '}
-              <span className="font-semibold text-emerald-400">{stats.totalNodes}</span> 个代理节点，实时在线率{' '}
-              <span className="font-semibold text-indigo-400">{onlineRate}%</span>。
+              <span className="font-semibold text-emerald-400">{stats.totalNodes}</span> 个代理节点，实时存活率{' '}
+              <span className="font-semibold text-indigo-400">{survivalRate}%</span>。
             </p>
           </div>
 
@@ -128,7 +132,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           <div className="flex items-baseline gap-1.5 sm:gap-2 truncate">
             <span className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{stats.totalNodes}</span>
             <span className="text-[10px] sm:text-xs text-emerald-400 font-medium truncate">
-              {enableTcpPing ? `(${stats.onlineNodes} 在线)` : '就绪'}
+              {enableTcpPing ? `(${aliveNodes} 可用)` : '就绪'}
             </span>
           </div>
           <div className="mt-2 sm:mt-3 flex items-center text-[11px] sm:text-xs text-emerald-400 font-medium">
@@ -158,19 +162,24 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             )}
           </div>
           <div className="flex items-baseline gap-1.5 sm:gap-2">
-            <span className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{onlineRate}%</span>
+            <span className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{survivalRate}%</span>
             <span className="text-[10px] sm:text-xs text-slate-400">存活率</span>
           </div>
-          <div className="mt-2 sm:mt-3 flex items-center gap-2 text-[10px] sm:text-xs">
-            <span className="inline-flex items-center gap-0.5 text-emerald-400">
-              🟢 {stats.onlineNodes}
+          <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 text-[10px] sm:text-xs">
+            <span className="inline-flex items-center gap-0.5 text-emerald-400" title="极速/良好 (≤300ms)">
+              🟢 {fastCount}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-amber-400">
-              🟡 {stats.slowNodes}
+            <span className="inline-flex items-center gap-0.5 text-amber-400" title="缓慢可用 (>300ms)">
+              🟡 {slowCount}
             </span>
-            <span className="inline-flex items-center gap-0.5 text-rose-400">
+            <span className="inline-flex items-center gap-0.5 text-rose-400" title="超时不可用">
               🔴 {stats.timeoutNodes}
             </span>
+            {unknownNodes > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-slate-400" title="未测试">
+                ⚪ {unknownNodes}
+              </span>
+            )}
           </div>
         </div>
 

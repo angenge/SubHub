@@ -160,6 +160,15 @@ export async function executeComprehensiveTests() {
     if (node.hy2Opts?.obfsPassword !== 'hy2obfspass') throw new Error('obfs password 解析错误');
   });
 
+  runTest('Protocol Parsers', '解析含未编码百分号与特殊符号的节点名称 (Safe URI Decode)', () => {
+    const rawSpecialVless = 'vless://11111111-2222-3333-4444-555555555555@hk.node.com:443?type=tcp#🇭🇰 香港 50% 专线 [折后%E4]';
+    const rawSpecialTrojan = 'trojan://pass123@tw.node.com:443#🇹🇼 台湾 100% 高速节点';
+    const node1 = parseUri(rawSpecialVless);
+    const node2 = parseUri(rawSpecialTrojan);
+    if (!node1 || !node1.name.includes('50%')) throw new Error('VLESS 50% 节点名称解析失败');
+    if (!node2 || !node2.name.includes('100%')) throw new Error('Trojan 100% 节点名称解析失败');
+  });
+
   runTest('Protocol Parsers', '多节点混合纯文本 + UTF-8 BOM 容错批量解析', () => {
     const rawContent = '\uFEFF' + [
       sampleVlessReality,
@@ -431,8 +440,8 @@ proxies:
 
   runTest('Engine Pipeline', '最大延迟阈值与离线节点拦截', () => {
     const nodesWithPing: ProxyNode[] = [
-      { ...testNodes[0], ping: 80, status: 'online' },
-      { ...testNodes[1], ping: 220, status: 'online' },
+      { ...testNodes[0], ping: 80, status: 'fast' },
+      { ...testNodes[1], ping: 220, status: 'fast' },
       { ...testNodes[2], ping: 999, status: 'slow' },
       { ...testNodes[3], ping: undefined, status: 'timeout' },
     ];
@@ -727,7 +736,7 @@ proxies:
       {
         nodeId: 'test_probe_node_1',
         ping: 45,
-        status: 'online' as const,
+        status: 'fast' as const,
         checkedAt: new Date().toISOString(),
       },
     ];
@@ -811,7 +820,7 @@ proxies:
         server: `node${i % 80}.example.com`,
         port: 10000 + (i % 5000),
         ping: (i * 7) % 400,
-        status: (i % 10 === 0 ? 'timeout' : 'online') as 'timeout' | 'online',
+        status: (i % 10 === 0 ? 'timeout' : 'fast') as 'timeout' | 'fast',
       });
     }
 

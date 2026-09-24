@@ -3,6 +3,7 @@ import { X, Check, Copy, ShieldCheck, Smartphone, Terminal, Server } from 'lucid
 import { QRCodeSVG } from 'qrcode.react';
 import { AggregateGroup } from '../../core/types/index.js';
 import { getClashSecret } from '../../client/api/index.js';
+import { copyToClipboard } from '../lib/utils.js';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -62,8 +63,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
     done
   '`;
 
-  const handleCopy = (url: string, format: string) => {
-    navigator.clipboard.writeText(url);
+  const handleCopy = async (url: string, format: string) => {
+    await copyToClipboard(url);
     setCopiedFormat(format);
     setTimeout(() => setCopiedFormat(null), 2000);
   };

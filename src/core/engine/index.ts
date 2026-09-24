@@ -141,7 +141,7 @@ export function processAggregateNodes(
 
   // 5. Filter by Online / Latency
   if (group.filterOnlineOnly) {
-    result = result.filter((n) => n.status === 'online' || (n.ping !== undefined && n.ping > 0));
+    result = result.filter((n) => n.status === 'fast' || n.status === 'online' || n.status === 'slow' || (n.ping !== undefined && n.ping > 0));
   }
 
   if (group.maxPing && group.maxPing > 0) {

@@ -47,7 +47,7 @@ export const nodes = sqliteTable('nodes', {
   countryCode: text('country_code'),
   ping: integer('ping'), // ms, -1 for timeout
   lastCheckedAt: text('last_checked_at'),
-  status: text('status', { enum: ['online', 'slow', 'timeout', 'unknown'] }).default('unknown'),
+  status: text('status', { enum: ['fast', 'slow', 'timeout', 'unknown', 'online'] }).default('unknown'),
   rawUri: text('raw_uri'),
   rawData: text('raw_data'), // JSON object for full fidelity
 });

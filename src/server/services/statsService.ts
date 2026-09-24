@@ -9,9 +9,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   // Nodes of active subscriptions
   const nodes = await getAllNodes(undefined, false);
 
-  let onlineNodes = 0;
+  let fastNodes = 0;
   let slowNodes = 0;
   let timeoutNodes = 0;
+  let unknownNodes = 0;
 
   const countryMap = new Map<string, { country: string; code: string; count: number }>();
   const protocolMap = new Map<string, number>();
@@ -30,9 +31,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   for (const node of nodes) {
     // Status counts
-    if (node.status === 'online') onlineNodes++;
+    if (node.status === 'fast' || node.status === 'online') fastNodes++;
     else if (node.status === 'slow') slowNodes++;
     else if (node.status === 'timeout') timeoutNodes++;
+    else unknownNodes++;
 
     // Country distribution
     const cName = node.country || '其他';
@@ -54,9 +56,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return {
     totalSubscriptions: activeSubscriptions.length,
     totalNodes: nodes.length,
-    onlineNodes,
+    fastNodes,
     slowNodes,
     timeoutNodes,
+    unknownNodes,
+    aliveNodes: fastNodes + slowNodes,
+    onlineNodes: fastNodes,
     totalTrafficUsed,
     totalTrafficQuota,
     countryDistribution,

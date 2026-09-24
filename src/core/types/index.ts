@@ -70,7 +70,7 @@ export interface ProxyNode {
   // Health & Speed Status
   ping?: number; // ms, -1 for timeout
   lastCheckedAt?: string;
-  status?: 'online' | 'slow' | 'timeout' | 'unknown';
+  status?: 'fast' | 'slow' | 'timeout' | 'unknown' | 'online';
   
   rawUri?: string;
 }
@@ -160,7 +160,7 @@ export interface SyncLog {
 export interface PingResult {
   nodeId: string;
   ping: number; // in ms, -1 if timeout
-  status: 'online' | 'slow' | 'timeout';
+  status: 'fast' | 'slow' | 'timeout' | 'online';
   checkedAt: string;
   error?: string;
 }
@@ -168,9 +168,12 @@ export interface PingResult {
 export interface DashboardStats {
   totalSubscriptions: number;
   totalNodes: number;
-  onlineNodes: number;
+  fastNodes: number;
   slowNodes: number;
   timeoutNodes: number;
+  unknownNodes?: number;
+  aliveNodes?: number;
+  onlineNodes?: number; // compatibility alias for fastNodes
   totalTrafficUsed: number;
   totalTrafficQuota: number;
   countryDistribution: { country: string; code: string; count: number }[];

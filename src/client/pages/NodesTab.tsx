@@ -100,10 +100,15 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       if (selectedProtocol !== 'all' && n.type.toLowerCase() !== selectedProtocol.toLowerCase()) return false;
       if (selectedCountry !== 'all' && n.country !== selectedCountry) return false;
       if (selectedStatus !== 'all') {
-        if (selectedStatus === 'online' && n.status !== 'online') return false;
-        if (selectedStatus === 'slow' && n.status !== 'slow') return false;
-        if (selectedStatus === 'timeout' && n.status !== 'timeout') return false;
-        if (selectedStatus === 'unknown' && n.status !== 'unknown' && n.ping !== undefined) return false;
+        const isFast = n.status === 'fast' || n.status === 'online' || (n.ping !== undefined && n.ping > 0 && n.ping <= 300);
+        const isSlow = n.status === 'slow' || (n.ping !== undefined && n.ping > 300);
+        const isTimeout = n.status === 'timeout' || n.ping === -1;
+        const isUnknown = !isFast && !isSlow && !isTimeout;
+
+        if ((selectedStatus === 'fast' || selectedStatus === 'online') && !isFast) return false;
+        if (selectedStatus === 'slow' && !isSlow) return false;
+        if (selectedStatus === 'timeout' && !isTimeout) return false;
+        if (selectedStatus === 'unknown' && !isUnknown) return false;
       }
       if (query) {
         const matchName = n.name.toLowerCase().includes(query);
@@ -294,7 +299,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </span>
           {[
             { id: 'all', label: `全部 (${activeNodes.length})` },
-            { id: 'online', label: '🟢 正常' },
+            { id: 'fast', label: '🟢 极速' },
             { id: 'slow', label: '🟡 缓慢' },
             { id: 'timeout', label: '🔴 超时' },
             { id: 'unknown', label: '⚪ 未测' },
