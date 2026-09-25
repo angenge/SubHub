@@ -35,6 +35,11 @@ const TEST_URL = process.env.TEST_URL || 'https://cp.cloudflare.com/generate_204
 const MIHOMO_BIN = process.env.MIHOMO_PATH || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo');
 const MIHOMO_PORT = parseInt(process.env.MIHOMO_PORT || '9090', 10);
 const MIHOMO_API = `http://127.0.0.1:${MIHOMO_PORT}`;
+const FETCH_TIMEOUT_MS = parseInt(process.env.FETCH_TIMEOUT_MS || '15000', 10);
+const FETCH_RETRIES = parseInt(process.env.FETCH_RETRIES || '3', 10);
+const FETCH_RETRY_DELAY_MS = parseInt(process.env.FETCH_RETRY_DELAY_MS || '3000', 10);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PROBE_TMP_DIR = path.join(os.tmpdir(), 'subhub_probe');
 const PROBE_CONFIG_PATH = path.join(PROBE_TMP_DIR, 'config.yaml');
@@ -516,37 +521,52 @@ async function runProbeCycle() {
   console.log(`\n[${nowStr}] 🚀 正在连接云端拉取待测节点...`);
 
   try {
-    // 1. 获取待测节点列表及 Clash 格式配置
+    // 1. 获取待测节点列表及 Clash 格式配置（单次网络抖动自动重试，避免整轮直接跳过）
     let nodes = [];
     let clashConfig = '';
-    try {
-      const res = await fetch(`${SUBHUB_URL}/api/agent/nodes`, {
-        headers: {
-          'Authorization': `Bearer ${AGENT_SECRET}`,
-          'User-Agent': 'SubHub-Probe-Agent/2.0',
-        },
-        signal: AbortSignal.timeout(15000),
-      });
+    let fetched = false;
+    let lastErr = null;
+    for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
+      try {
+        const res = await fetch(`${SUBHUB_URL}/api/agent/nodes`, {
+          headers: {
+            'Authorization': `Bearer ${AGENT_SECRET}`,
+            'User-Agent': 'SubHub-Probe-Agent/2.0',
+          },
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errText}`);
-      }
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
 
-      const json = await res.json();
-      if (!json.success || !json.data) {
-        throw new Error(json.message || '获取节点数据异常');
-      }
+        const json = await res.json();
+        if (!json.success || !json.data) {
+          throw new Error(json.message || '获取节点数据异常');
+        }
 
-      // 兼容数组（旧协议）与对象格式（新协议）
-      if (Array.isArray(json.data)) {
-        nodes = json.data;
-      } else {
-        nodes = json.data.nodes || [];
-        clashConfig = json.data.clashConfig || '';
+        // 兼容数组（旧协议）与对象格式（新协议）
+        if (Array.isArray(json.data)) {
+          nodes = json.data;
+        } else {
+          nodes = json.data.nodes || [];
+          clashConfig = json.data.clashConfig || '';
+        }
+        fetched = true;
+        break;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < FETCH_RETRIES) {
+          const delayMs = FETCH_RETRY_DELAY_MS * (attempt + 1);
+          console.warn(`  ⚠️ 第 ${attempt + 1} 次拉取失败 (${err.message})，${(delayMs / 1000).toFixed(1)}s 后自动重试...`);
+          await sleep(delayMs);
+        }
       }
-    } catch (err) {
-      console.error(`❌ 拉取失败: ${err.message}`);
+    }
+
+    if (!fetched) {
+      console.error(`❌ 云端节点拉取连续失败 ${FETCH_RETRIES + 1} 次: ${lastErr ? lastErr.message : '未知错误'}`);
       return;
     }
 

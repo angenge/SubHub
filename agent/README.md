@@ -66,3 +66,6 @@ docker run -d \
 | `TEST_URL` | `https://cp.cloudflare.com/generate_204` | 测速基准 URL |
 | `MIHOMO_PATH` | `mihomo` | 自定义 Mihomo 可执行文件路径 |
 | `MIHOMO_PORT` | `9090` | Mihomo 外部控制器本地监听端口 |
+| `FETCH_TIMEOUT_MS` | `15000` | 云端节点拉取单次超时时间（毫秒） |
+| `FETCH_RETRIES` | `3` | 节点拉取失败后的额外重试次数（总尝试 = 重试 + 1） |
+| `FETCH_RETRY_DELAY_MS` | `3000` | 重试基础间隔（毫秒），按尝试次数倍增退避 |
