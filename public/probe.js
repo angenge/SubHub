@@ -217,9 +217,7 @@ async function resolveMihomoBinary() {
 
   const mirrors = [
     `https://dl.hiz.one/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
-    `https://ghfast.top/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
     `https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
-    `https://ghproxy.net/https://github.com/MetaCubeX/mihomo/releases/download/${ver}/${fileName}`,
   ];
 
   let downloaded = false;
