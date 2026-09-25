@@ -17,7 +17,7 @@ const os = require('node:os');
 const zlib = require('node:zlib');
 const stream = require('node:stream');
 const util = require('node:util');
-const { spawn, execSync } = require('node:child_process');
+const { spawn, execSync, spawnSync } = require('node:child_process');
 
 const streamPipeline = util.promisify(stream.pipeline);
 
@@ -38,6 +38,10 @@ const MIHOMO_API = `http://127.0.0.1:${MIHOMO_PORT}`;
 
 const PROBE_TMP_DIR = path.join(os.tmpdir(), 'subhub_probe');
 const PROBE_CONFIG_PATH = path.join(PROBE_TMP_DIR, 'config.yaml');
+
+// 真实 Mihomo 内核解压后通常 >20MB；2MB 作为最低可信下限，
+// 用于识别下载中断/失败留下的损坏或 HTML 报错残留文件。
+const MIN_MIHOMO_SIZE = 2 * 1024 * 1024;
 
 let mihomoProcess = null;
 let isCycleRunning = false;
@@ -81,6 +85,71 @@ process.on('exit', () => {
 });
 
 /**
+ * 校验指定文件是否为可用的 Mihomo 内核二进制。
+ * 仅以"存在且可执行"作为准入口会误把上次下载中断留下的
+ * 残留文件当成可用内核，导致后续一直启动损坏的二进制。
+ *
+ * 校验要点：
+ * 1. 长度下限（真实内核解压后 >20MB）；
+ * 2. 原生可执行文件魔数（ELF / PE / Mach-O），阻断 HTML、压缩包、空文件等残留；
+ * 3. 执行 `-v` 仅取 stdout 判定版本信息，避免 ENOEXEC 走 sh 回退时
+ *    stderr 错误信息里夹带文件名（路径含 “mihomo”）导致的误判。
+ */
+function hasBinaryMagic(filePath) {
+  let fd;
+  try {
+    fd = fs.openSync(filePath, 'r');
+  } catch {
+    return false;
+  }
+  const buf = Buffer.alloc(4);
+  try {
+    const n = fs.readSync(fd, buf, 0, 4, 0);
+    if (n < 4) return false;
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (process.platform === 'win32') {
+    return buf[0] === 0x4d && buf[1] === 0x5a; // MZ
+  }
+  if (process.platform === 'darwin') {
+    const sig = buf.readUInt32BE(0);
+    return sig === 0xfeedface || sig === 0xfeedfacf || sig === 0xcefaedfe || sig === 0xcffaedfe;
+  }
+  return buf[0] === 0x7f && buf[1] === 0x45 && buf[2] === 0x4c && buf[3] === 0x46; // \x7fELF
+}
+
+function isValidMihomoBinary(filePath) {
+  try {
+    const st = fs.statSync(filePath);
+    if (!st.isFile() || st.size < MIN_MIHOMO_SIZE) return false;
+    if (!hasBinaryMagic(filePath)) {
+      // 可能是权限不足导致无法打开/读取（如手动解压后未配置权限），补权限后重试
+      try { fs.chmodSync(filePath, 0o755); } catch {}
+      if (!hasBinaryMagic(filePath)) return false;
+    }
+
+    const probe = () =>
+      spawnSync(filePath, ['-v'], {
+        encoding: 'utf8',
+        timeout: 5000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    let r = probe();
+    if (r.error && r.error.code === 'EACCES') {
+      // 缺少执行权限（如手动解压后未 +x），补权限后重新探测
+      fs.chmodSync(filePath, 0o755);
+      r = probe();
+    }
+    if (r.error || r.signal || r.status === null) return false;
+    const out = r.stdout || '';
+    return /mihomo|meta|clash/i.test(out);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 自动定位或下载适配当前系统架构的 Mihomo 内核二进制
  */
 async function resolveMihomoBinary() {
@@ -99,19 +168,27 @@ async function resolveMihomoBinary() {
     if (result) return binName;
   } catch {}
 
-  // 3. 检查当前工作目录或探针临时目录中是否已有内核
+  // 3. 检查探针临时目录中是否已有可用内核
   const localBin = path.join(PROBE_TMP_DIR, binName);
   if (fs.existsSync(localBin)) {
-    try {
-      fs.accessSync(localBin, fs.constants.X_OK);
-      return localBin;
-    } catch {
-      try { fs.chmodSync(localBin, 0o755); return localBin; } catch {}
+    if (isValidMihomoBinary(localBin)) {
+      try {
+        fs.accessSync(localBin, fs.constants.X_OK);
+        return localBin;
+      } catch {
+        try { fs.chmodSync(localBin, 0o755); return localBin; } catch {}
+      }
+    } else {
+      // 上次下载中断/失败留下的损坏残留：清理后让本轮重新下载，
+      // 避免后续启动一个损坏的二进制而不自知。
+      console.warn(`⚠️ ${localBin} 无效或已损坏（可能是上次下载中断残留），已自动清理并重新获取内核...`);
+      try { fs.rmSync(localBin, { force: true }); } catch {}
     }
   }
 
+  // 4. 检查当前工作目录
   const cwdBin = path.join(process.cwd(), binName);
-  if (fs.existsSync(cwdBin)) {
+  if (fs.existsSync(cwdBin) && isValidMihomoBinary(cwdBin)) {
     try {
       fs.accessSync(cwdBin, fs.constants.X_OK);
       return cwdBin;
@@ -158,11 +235,18 @@ async function resolveMihomoBinary() {
           fs.createWriteStream(localBin)
         );
         fs.chmodSync(localBin, 0o755);
-        downloaded = true;
-        console.log(`✅ Mihomo 内核已成功就绪: ${localBin}`);
-        break;
+        if (isValidMihomoBinary(localBin)) {
+          downloaded = true;
+          console.log(`✅ Mihomo 内核已成功就绪: ${localBin}`);
+          break;
+        }
+        // 解压完成但校验失败（内容损坏/非内核），清理后尝试下一镜像源
+        try { fs.rmSync(localBin, { force: true }); } catch {}
+        console.warn(`  ⚠️ 下载的内核未通过有效性校验，尝试切换下一源...`);
       }
     } catch (err) {
+      // 删除中断下载产生的残留文件，避免把损坏产物误当可用内核
+      try { fs.rmSync(localBin, { force: true }); } catch {}
       console.warn(`  ⚠️ 下载尝试遇到问题 (${err.message})，尝试切换下一源...`);
     }
   }
