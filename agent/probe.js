@@ -354,6 +354,22 @@ async function testNodeDelay(nodeName, timeoutMs = TIMEOUT_MS) {
 }
 
 /**
+ * 判断节点是否为基于 UDP 传输的协议（如 Hysteria2 / TUIC / WireGuard）
+ */
+function isUdpBasedNode(node) {
+  if (!node) return false;
+  const type = String(node.type || '').toLowerCase();
+  if (['hysteria2', 'hy2', 'tuic', 'wireguard'].includes(type)) {
+    return true;
+  }
+  const name = String(node.name || '').toLowerCase();
+  if (name.includes('hysteria') || name.includes('hy2') || name.includes('tuic') || name.includes('wireguard')) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * 受控并发池执行测速 (默认 3 并发，兼顾吞吐效率与网络稳定性)
  */
 async function batchTestNodes(nodes) {
@@ -368,11 +384,24 @@ async function batchTestNodes(nodes) {
       const node = nodes[idx];
 
       try {
-        const { ping, status } = await testNodeDelay(node.name, TIMEOUT_MS);
+        let testRes = await testNodeDelay(node.name, TIMEOUT_MS);
+
+        // 针对 UDP 协议节点（Hysteria2 / TUIC 等）执行单次轻量防抖复测，防止瞬时 UDP 丢包误判下线
+        if (testRes.status === 'timeout' && isUdpBasedNode(node)) {
+          await new Promise((r) => setTimeout(r, 400));
+          const retryRes = await testNodeDelay(node.name, Math.min(TIMEOUT_MS, 5000));
+          if (retryRes.status !== 'timeout' && retryRes.status !== 'not_found') {
+            if (process.env.DEBUG) {
+              console.log(`[Probe] ⚡ UDP 节点防抖复测成功: ${node.name} (${retryRes.ping}ms)`);
+            }
+            testRes = retryRes;
+          }
+        }
+
         results[idx] = {
           nodeId: node.id,
-          ping: ping >= 0 ? ping : null,
-          status: status === 'not_found' ? 'timeout' : status,
+          ping: testRes.ping >= 0 ? testRes.ping : null,
+          status: testRes.status === 'not_found' ? 'timeout' : testRes.status,
           checkedAt: new Date().toISOString(),
         };
       } catch {
