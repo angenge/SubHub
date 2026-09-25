@@ -12,11 +12,23 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { ProxyNode, Subscription } from '../../core/types/index.js';
+import { ProxyNode, Subscription, ProxyType } from '../../core/types/index.js';
 import { LatencyBadge } from '../components/LatencyBadge.js';
 import { CountryBadge } from '../components/CountryBadge.js';
 import { NodeDetailModal } from '../components/NodeDetailModal.js';
 import { formatDate } from '../lib/utils.js';
+
+const PROTOCOL_LABELS: Record<ProxyType, string> = {
+  vless: 'VLESS',
+  vmess: 'VMess',
+  trojan: 'Trojan',
+  hysteria2: 'Hysteria2',
+  ss: 'Shadowsocks',
+  anytls: 'AnyTLS',
+  socks5: 'SOCKS5',
+  http: 'HTTP(S)',
+  wireguard: 'WireGuard',
+};
 
 interface NodesTabProps {
   nodes: ProxyNode[];
@@ -266,11 +278,11 @@ export const NodesTab: React.FC<NodesTabProps> = ({
               className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none focus:border-emerald-500"
             >
               <option value="all">所有协议</option>
-              <option value="vless">VLESS</option>
-              <option value="vmess">VMess</option>
-              <option value="trojan">Trojan</option>
-              <option value="hysteria2">Hysteria2</option>
-              <option value="ss">Shadowsocks</option>
+              {(Object.entries(PROTOCOL_LABELS) as [ProxyType, string][]).map(([proto, label]) => (
+                <option key={proto} value={proto}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
 

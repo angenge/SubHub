@@ -10,13 +10,21 @@ interface AggregateModalProps {
   subscriptions: Subscription[];
 }
 
-const PROTOCOLS: { label: string; value: ProxyType }[] = [
-  { label: 'VLESS', value: 'vless' },
-  { label: 'VMess', value: 'vmess' },
-  { label: 'Trojan', value: 'trojan' },
-  { label: 'Hysteria2', value: 'hysteria2' },
-  { label: 'Shadowsocks', value: 'ss' },
-];
+const PROTOCOL_CONFIG: Record<ProxyType, { label: string }> = {
+  vless: { label: 'VLESS' },
+  vmess: { label: 'VMess' },
+  trojan: { label: 'Trojan' },
+  hysteria2: { label: 'Hysteria2' },
+  ss: { label: 'Shadowsocks' },
+  anytls: { label: 'AnyTLS' },
+  socks5: { label: 'SOCKS5' },
+  http: { label: 'HTTP(S)' },
+  wireguard: { label: 'WireGuard' },
+};
+
+const PROTOCOLS: { label: string; value: ProxyType }[] = (
+  Object.entries(PROTOCOL_CONFIG) as [ProxyType, { label: string }][]
+).map(([value, conf]) => ({ label: conf.label, value }));
 
 export const AggregateModal: React.FC<AggregateModalProps> = ({
   isOpen,

@@ -4,9 +4,18 @@ export type ProxyType =
   | 'trojan'
   | 'ss'
   | 'hysteria2'
+  | 'anytls'
   | 'socks5'
   | 'http'
   | 'wireguard';
+
+/**
+ * 编译期穷尽性检查辅助函数
+ * 当在 switch (type) 分支中遗漏了某个 ProxyType 分支时，TypeScript 会在此处产生编译报错
+ */
+export function assertNever(value: never, message?: string): never {
+  throw new Error(message || `未受支持或未穷尽的协议类型: ${JSON.stringify(value)}`);
+}
 
 export type NodeNetworkType = 'tcp' | 'ws' | 'grpc' | 'h2' | 'http';
 

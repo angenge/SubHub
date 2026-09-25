@@ -380,6 +380,46 @@ export function parseHysteria2Uri(uri: string): ProxyNode | null {
   }
 }
 
+export function parseAnytlsUri(uri: string): ProxyNode | null {
+  try {
+    const url = new URL(uri);
+    const password = safeDecodeURIComponent(url.username || '');
+    const server = url.hostname;
+    const port = parseInt(url.port || '443', 10);
+    if (!server || isNaN(port) || port <= 0 || port > 65535) return null;
+    const name = safeDecodeURIComponent(url.hash ? url.hash.slice(1) : `${server}:${port}`);
+    const params = url.searchParams;
+
+    const sni = params.get('sni') || server;
+    const skipCertVerify = params.get('insecure') === '1' || params.get('allowInsecure') === '1';
+    const fingerprint = params.get('fp') || params.get('client-fingerprint') || undefined;
+    const alpnStr = params.get('alpn');
+    const alpn = alpnStr ? alpnStr.split(',') : undefined;
+
+    const country = detectCountry(name);
+
+    return {
+      id: generateNodeId(server, port, 'anytls', name),
+      name,
+      type: 'anytls',
+      server,
+      port,
+      password,
+      tls: true,
+      sni,
+      skipCertVerify,
+      fingerprint,
+      alpn,
+      country: country.name,
+      countryCode: country.code,
+      status: 'unknown',
+      rawUri: uri,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 export function parseUri(uri: string): ProxyNode | null {
   const trimmed = uri.trim();
   if (trimmed.startsWith('vless://')) return parseVlessUri(trimmed);
@@ -387,5 +427,6 @@ export function parseUri(uri: string): ProxyNode | null {
   if (trimmed.startsWith('trojan://')) return parseTrojanUri(trimmed);
   if (trimmed.startsWith('ss://')) return parseShadowsocksUri(trimmed);
   if (trimmed.startsWith('hysteria2://') || trimmed.startsWith('hy2://')) return parseHysteria2Uri(trimmed);
+  if (trimmed.startsWith('anytls://')) return parseAnytlsUri(trimmed);
   return null;
 }

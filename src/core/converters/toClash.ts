@@ -1,102 +1,143 @@
 import YAML from 'yaml';
-import { ProxyNode } from '../types/index.js';
+import { ProxyNode, assertNever } from '../types/index.js';
 
 export function convertToClashProxyObject(node: ProxyNode): any {
   const base: any = {
     name: node.name,
-    type: node.type === 'hysteria2' ? 'hysteria2' : node.type,
+    type: node.type,
     server: node.server,
     port: node.port,
     udp: node.udp !== false,
   };
 
-  if (node.type === 'ss') {
-    base.cipher = node.cipher || 'aes-128-gcm';
-    base.password = node.password;
-    if (node.plugin) {
-      base.plugin = node.plugin;
-      if (node.pluginOpts) {
-        base['plugin-opts'] = node.pluginOpts;
+  switch (node.type) {
+    case 'ss': {
+      base.cipher = node.cipher || 'aes-128-gcm';
+      base.password = node.password;
+      if (node.plugin) {
+        base.plugin = node.plugin;
+        if (node.pluginOpts) {
+          base['plugin-opts'] = node.pluginOpts;
+        }
       }
+      break;
     }
-  } else if (node.type === 'vmess') {
-    base.uuid = node.uuid;
-    base.alterId = node.alterId || 0;
-    base.cipher = node.cipher || 'auto';
-    base.network = node.network || 'tcp';
-    base.tls = !!node.tls;
-    if (node.sni) base.servername = node.sni;
-    if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
-    if (node.alpn) base.alpn = node.alpn;
-    if (node.skipCertVerify) base['skip-cert-verify'] = true;
-    if (node.wsOpts) {
-      base['ws-opts'] = {
-        path: node.wsOpts.path || '/',
-        headers: node.wsOpts.headers,
-      };
+    case 'vmess': {
+      base.uuid = node.uuid;
+      base.alterId = node.alterId || 0;
+      base.cipher = node.cipher || 'auto';
+      base.network = node.network || 'tcp';
+      base.tls = !!node.tls;
+      if (node.sni) base.servername = node.sni;
+      if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+      if (node.alpn) base.alpn = node.alpn;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      if (node.wsOpts) {
+        base['ws-opts'] = {
+          path: node.wsOpts.path || '/',
+          headers: node.wsOpts.headers,
+        };
+      }
+      if (node.grpcOpts) {
+        base['grpc-opts'] = {
+          'grpc-service-name': node.grpcOpts.serviceName,
+        };
+      }
+      break;
     }
-    if (node.grpcOpts) {
-      base['grpc-opts'] = {
-        'grpc-service-name': node.grpcOpts.serviceName,
-      };
+    case 'vless': {
+      base.uuid = node.uuid;
+      base.flow = node.flow;
+      base.network = node.network || 'tcp';
+      base.tls = !!node.tls;
+      if (node.sni) base.servername = node.sni;
+      if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+      if (node.alpn) base.alpn = node.alpn;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      if (node.reality) {
+        base['reality-opts'] = {
+          'public-key': node.reality.publicKey,
+          'short-id': node.reality.shortId,
+        };
+        if (node.reality.spiderX) base['reality-opts']['spider-x'] = node.reality.spiderX;
+      }
+      if (node.wsOpts) {
+        base['ws-opts'] = {
+          path: node.wsOpts.path || '/',
+          headers: node.wsOpts.headers,
+        };
+      }
+      if (node.grpcOpts) {
+        base['grpc-opts'] = {
+          'grpc-service-name': node.grpcOpts.serviceName,
+        };
+      }
+      break;
     }
-  } else if (node.type === 'vless') {
-    base.uuid = node.uuid;
-    base.flow = node.flow;
-    base.network = node.network || 'tcp';
-    base.tls = !!node.tls;
-    if (node.sni) base.servername = node.sni;
-    if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
-    if (node.alpn) base.alpn = node.alpn;
-    if (node.skipCertVerify) base['skip-cert-verify'] = true;
-    if (node.reality) {
-      base['reality-opts'] = {
-        'public-key': node.reality.publicKey,
-        'short-id': node.reality.shortId,
-      };
-      if (node.reality.spiderX) base['reality-opts']['spider-x'] = node.reality.spiderX;
+    case 'trojan': {
+      base.password = node.password;
+      base.network = node.network || 'tcp';
+      base.tls = true;
+      if (node.sni) base.sni = node.sni;
+      if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      if (node.alpn) base.alpn = node.alpn;
+      if (node.wsOpts) {
+        base['ws-opts'] = {
+          path: node.wsOpts.path || '/',
+          headers: node.wsOpts.headers,
+        };
+      }
+      if (node.grpcOpts) {
+        base['grpc-opts'] = {
+          'grpc-service-name': node.grpcOpts.serviceName,
+        };
+      }
+      break;
     }
-    if (node.wsOpts) {
-      base['ws-opts'] = {
-        path: node.wsOpts.path || '/',
-        headers: node.wsOpts.headers,
-      };
+    case 'hysteria2': {
+      base.password = node.password || node.hy2Opts?.auth;
+      base.tls = true;
+      if (node.sni) base.sni = node.sni;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      if (node.alpn) base.alpn = node.alpn;
+      if (node.hy2Opts?.upMbps) base.up = node.hy2Opts.upMbps;
+      if (node.hy2Opts?.downMbps) base.down = node.hy2Opts.downMbps;
+      if (node.hy2Opts?.obfs) {
+        base.obfs = node.hy2Opts.obfs;
+        base['obfs-password'] = node.hy2Opts.obfsPassword;
+      }
+      break;
     }
-    if (node.grpcOpts) {
-      base['grpc-opts'] = {
-        'grpc-service-name': node.grpcOpts.serviceName,
-      };
+    case 'anytls': {
+      base.password = node.password;
+      if (node.sni) base.sni = node.sni;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
+      if (node.alpn) base.alpn = node.alpn;
+      break;
     }
-  } else if (node.type === 'trojan') {
-    base.password = node.password;
-    base.network = node.network || 'tcp';
-    base.tls = true;
-    if (node.sni) base.sni = node.sni;
-    if (node.fingerprint) base['client-fingerprint'] = node.fingerprint;
-    if (node.skipCertVerify) base['skip-cert-verify'] = true;
-    if (node.alpn) base.alpn = node.alpn;
-    if (node.wsOpts) {
-      base['ws-opts'] = {
-        path: node.wsOpts.path || '/',
-        headers: node.wsOpts.headers,
-      };
+    case 'socks5': {
+      if (node.uuid) base.username = node.uuid;
+      if (node.password) base.password = node.password;
+      if (node.tls) base.tls = true;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      break;
     }
-    if (node.grpcOpts) {
-      base['grpc-opts'] = {
-        'grpc-service-name': node.grpcOpts.serviceName,
-      };
+    case 'http': {
+      if (node.uuid) base.username = node.uuid;
+      if (node.password) base.password = node.password;
+      if (node.tls) base.tls = true;
+      if (node.skipCertVerify) base['skip-cert-verify'] = true;
+      break;
     }
-  } else if (node.type === 'hysteria2') {
-    base.password = node.password || node.hy2Opts?.auth;
-    base.tls = true;
-    if (node.sni) base.sni = node.sni;
-    if (node.skipCertVerify) base['skip-cert-verify'] = true;
-    if (node.alpn) base.alpn = node.alpn;
-    if (node.hy2Opts?.upMbps) base.up = node.hy2Opts.upMbps;
-    if (node.hy2Opts?.downMbps) base.down = node.hy2Opts.downMbps;
-    if (node.hy2Opts?.obfs) {
-      base.obfs = node.hy2Opts.obfs;
-      base['obfs-password'] = node.hy2Opts.obfsPassword;
+    case 'wireguard': {
+      if (node.password) base['private-key'] = node.password;
+      if (node.reality?.publicKey) base['public-key'] = node.reality.publicKey;
+      break;
+    }
+    default: {
+      assertNever(node.type, `Clash 转换器未适配该协议类型: ${(node as any).type}`);
     }
   }
 

@@ -1,4 +1,4 @@
-﻿import { ProxyNode } from '../types/index.js';
+﻿import { ProxyNode, assertNever } from '../types/index.js';
 
 export interface SingboxGenerateOptions {
   mixedPort?: number; // default 1080 (serves both SOCKS5 and HTTP simultaneously)
@@ -11,27 +11,100 @@ export interface SingboxGenerateOptions {
 export function convertToSingboxOutbound(node: ProxyNode): any {
   const base: any = {
     tag: node.name,
-    type: node.type === 'ss' ? 'shadowsocks' : node.type,
+    type: node.type === 'ss' ? 'shadowsocks' : (node.type === 'socks5' ? 'socks' : node.type),
     server: node.server,
     server_port: node.port,
   };
 
-  if (node.type === 'ss') {
-    base.method = node.cipher || 'aes-128-gcm';
-    base.password = node.password;
-    if (node.plugin) {
-      base.plugin = node.plugin;
-      if (node.pluginOpts) {
-        base.plugin_opts = Object.entries(node.pluginOpts)
-          .map(([k, v]) => (v === true ? k : `${k}=${v}`))
-          .join(';');
+  switch (node.type) {
+    case 'ss': {
+      base.method = node.cipher || 'aes-128-gcm';
+      base.password = node.password;
+      if (node.plugin) {
+        base.plugin = node.plugin;
+        if (node.pluginOpts) {
+          base.plugin_opts = Object.entries(node.pluginOpts)
+            .map(([k, v]) => (v === true ? k : `${k}=${v}`))
+            .join(';');
+        }
       }
+      break;
     }
-  } else if (node.type === 'vmess') {
-    base.uuid = node.uuid;
-    base.security = node.cipher || 'auto';
-    base.alter_id = node.alterId || 0;
-    if (node.tls) {
+    case 'vmess': {
+      base.uuid = node.uuid;
+      base.security = node.cipher || 'auto';
+      base.alter_id = node.alterId || 0;
+      if (node.tls) {
+        base.tls = {
+          enabled: true,
+          server_name: node.sni,
+          insecure: node.skipCertVerify,
+        };
+        if (node.fingerprint) {
+          base.tls.utls = {
+            enabled: true,
+            fingerprint: node.fingerprint,
+          };
+        }
+      }
+      if (node.network === 'ws') {
+        base.transport = {
+          type: 'ws',
+          path: node.wsOpts?.path || '/',
+          headers: node.wsOpts?.headers,
+        };
+      } else if (node.network === 'grpc') {
+        base.transport = {
+          type: 'grpc',
+          service_name: node.grpcOpts?.serviceName || '',
+        };
+      }
+      break;
+    }
+    case 'vless': {
+      base.uuid = node.uuid;
+      base.flow = node.flow;
+      if (node.tls) {
+        const isReality = !!node.reality;
+        base.tls = {
+          enabled: true,
+          server_name: node.sni,
+          insecure: node.skipCertVerify,
+          // Reality requires uTLS to be enabled (default to 'chrome' if not specified)
+          utls: {
+            enabled: true,
+            fingerprint: node.fingerprint || (isReality ? 'chrome' : undefined),
+          },
+        };
+
+        if (!base.tls.utls.fingerprint) {
+          delete base.tls.utls;
+        }
+
+        if (node.reality) {
+          base.tls.reality = {
+            enabled: true,
+            public_key: node.reality.publicKey,
+            short_id: node.reality.shortId,
+          };
+        }
+      }
+      if (node.network === 'ws') {
+        base.transport = {
+          type: 'ws',
+          path: node.wsOpts?.path || '/',
+          headers: node.wsOpts?.headers,
+        };
+      } else if (node.network === 'grpc') {
+        base.transport = {
+          type: 'grpc',
+          service_name: node.grpcOpts?.serviceName || '',
+        };
+      }
+      break;
+    }
+    case 'trojan': {
+      base.password = node.password;
       base.tls = {
         enabled: true,
         server_name: node.sni,
@@ -43,100 +116,78 @@ export function convertToSingboxOutbound(node: ProxyNode): any {
           fingerprint: node.fingerprint,
         };
       }
+      if (node.network === 'ws') {
+        base.transport = {
+          type: 'ws',
+          path: node.wsOpts?.path || '/',
+          headers: node.wsOpts?.headers,
+        };
+      } else if (node.network === 'grpc') {
+        base.transport = {
+          type: 'grpc',
+          service_name: node.grpcOpts?.serviceName || '',
+        };
+      }
+      break;
     }
-    if (node.network === 'ws') {
-      base.transport = {
-        type: 'ws',
-        path: node.wsOpts?.path || '/',
-        headers: node.wsOpts?.headers,
-      };
-    } else if (node.network === 'grpc') {
-      base.transport = {
-        type: 'grpc',
-        service_name: node.grpcOpts?.serviceName || '',
-      };
-    }
-  } else if (node.type === 'vless') {
-    base.uuid = node.uuid;
-    base.flow = node.flow;
-    if (node.tls) {
-      const isReality = !!node.reality;
+    case 'hysteria2': {
+      base.password = node.password || node.hy2Opts?.auth;
       base.tls = {
         enabled: true,
         server_name: node.sni,
         insecure: node.skipCertVerify,
-        // Reality requires uTLS to be enabled (default to 'chrome' if not specified)
-        utls: {
-          enabled: true,
-          fingerprint: node.fingerprint || (isReality ? 'chrome' : undefined),
-        },
       };
-
-      if (!base.tls.utls.fingerprint) {
-        delete base.tls.utls;
+      if (node.hy2Opts?.upMbps && node.hy2Opts?.downMbps) {
+        base.up_mbps = node.hy2Opts.upMbps;
+        base.down_mbps = node.hy2Opts.downMbps;
       }
-
-      if (node.reality) {
-        base.tls.reality = {
-          enabled: true,
-          public_key: node.reality.publicKey,
-          short_id: node.reality.shortId,
+      if (node.hy2Opts?.obfs) {
+        base.obfs = {
+          type: node.hy2Opts.obfs,
+          password: node.hy2Opts.obfsPassword,
         };
       }
+      break;
     }
-    if (node.network === 'ws') {
-      base.transport = {
-        type: 'ws',
-        path: node.wsOpts?.path || '/',
-        headers: node.wsOpts?.headers,
-      };
-    } else if (node.network === 'grpc') {
-      base.transport = {
-        type: 'grpc',
-        service_name: node.grpcOpts?.serviceName || '',
-      };
-    }
-  } else if (node.type === 'trojan') {
-    base.password = node.password;
-    base.tls = {
-      enabled: true,
-      server_name: node.sni,
-      insecure: node.skipCertVerify,
-    };
-    if (node.fingerprint) {
-      base.tls.utls = {
+    case 'anytls': {
+      base.password = node.password;
+      base.tls = {
         enabled: true,
-        fingerprint: node.fingerprint,
+        server_name: node.sni,
+        insecure: node.skipCertVerify,
       };
+      if (node.fingerprint) {
+        base.tls.utls = {
+          enabled: true,
+          fingerprint: node.fingerprint,
+        };
+      }
+      break;
     }
-    if (node.network === 'ws') {
-      base.transport = {
-        type: 'ws',
-        path: node.wsOpts?.path || '/',
-        headers: node.wsOpts?.headers,
-      };
-    } else if (node.network === 'grpc') {
-      base.transport = {
-        type: 'grpc',
-        service_name: node.grpcOpts?.serviceName || '',
-      };
+    case 'socks5': {
+      if (node.uuid) base.username = node.uuid;
+      if (node.password) base.password = node.password;
+      break;
     }
-  } else if (node.type === 'hysteria2') {
-    base.password = node.password || node.hy2Opts?.auth;
-    base.tls = {
-      enabled: true,
-      server_name: node.sni,
-      insecure: node.skipCertVerify,
-    };
-    if (node.hy2Opts?.upMbps && node.hy2Opts?.downMbps) {
-      base.up_mbps = node.hy2Opts.upMbps;
-      base.down_mbps = node.hy2Opts.downMbps;
+    case 'http': {
+      if (node.uuid) base.username = node.uuid;
+      if (node.password) base.password = node.password;
+      if (node.tls) {
+        base.tls = {
+          enabled: true,
+          server_name: node.sni,
+          insecure: node.skipCertVerify,
+        };
+      }
+      break;
     }
-    if (node.hy2Opts?.obfs) {
-      base.obfs = {
-        type: node.hy2Opts.obfs,
-        password: node.hy2Opts.obfsPassword,
-      };
+    case 'wireguard': {
+      if (node.password) base.private_key = node.password;
+      if (node.reality?.publicKey) base.peer_public_key = node.reality.publicKey;
+      break;
+    }
+    default: {
+      assertNever(node.type, `Sing-box 转换器未适配该协议类型: ${(node as any).type}`);
     }
   }
 

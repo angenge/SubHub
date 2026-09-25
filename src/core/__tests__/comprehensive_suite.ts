@@ -100,6 +100,7 @@ const sampleVmessWs = 'vmess://' + Buffer.from(JSON.stringify({
 const sampleTrojanGrpc = 'trojan://pass123456@jp.node.com:443?type=grpc&serviceName=trojan-grpc-service&security=tls&sni=jp.node.com#%F0%9F%87%AF%F0%9F%87%B5%20JP-Trojan-gRPC';
 const sampleSsPlugin = 'ss://YWVzLTEyOC1nY206c2VjcmV0cGFzc3dvcmQ@tw.node.com:8388/?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dtw.node.com%3Btls#%F0%9F%87%B9%F0%9F%87%BC%20TW-SS-V2Ray';
 const sampleHy2 = 'hysteria2://hy2pass@kr.node.com:443?sni=kr.node.com&obfs=salamander&obfs-password=hy2obfspass#%F0%9F%87%B0%F0%9F%87%B7%20KR-Hysteria2';
+const sampleAnytls = 'anytls://anytlspass@kr.anytls.com:443?sni=kr.anytls.com#%F0%9F%87%B0%F0%9F%87%B7%20KR-AnyTLS';
 
 export async function executeComprehensiveTests() {
   console.log('\n======================================================');
@@ -160,6 +161,15 @@ export async function executeComprehensiveTests() {
     if (node.hy2Opts?.obfsPassword !== 'hy2obfspass') throw new Error('obfs password 解析错误');
   });
 
+  runTest('Protocol Parsers', '解析 AnyTLS 节点 (password, sni, tls)', () => {
+    const node = parseUri(sampleAnytls);
+    if (!node) throw new Error('解析失败');
+    if (node.type !== 'anytls') throw new Error('类型应为 anytls');
+    if (node.password !== 'anytlspass') throw new Error('password 解析错误');
+    if (node.sni !== 'kr.anytls.com') throw new Error('sni 解析错误');
+    if (!node.tls) throw new Error('tls 应为 true');
+  });
+
   runTest('Protocol Parsers', '解析含未编码百分号与特殊符号的节点名称 (Safe URI Decode)', () => {
     const rawSpecialVless = 'vless://11111111-2222-3333-4444-555555555555@hk.node.com:443?type=tcp#🇭🇰 香港 50% 专线 [折后%E4]';
     const rawSpecialTrojan = 'trojan://pass123@tw.node.com:443#🇹🇼 台湾 100% 高速节点';
@@ -205,10 +215,16 @@ proxies:
     port: 443
     password: mytrojanpass
     sni: sg.clash.com
+  - name: "🇰🇷 KR-Clash-AnyTLS"
+    type: anytls
+    server: 9.9.9.9
+    port: 443
+    password: myanytlspass
+    sni: kr.clash.com
 `;
     const nodes = parseNodesFromContent(clashYaml);
-    if (nodes.length !== 2) throw new Error(`期望 2 个节点, 实际 ${nodes.length}`);
-    if (nodes[0].type !== 'vless' || nodes[1].type !== 'trojan') throw new Error('节点类型解析不匹配');
+    if (nodes.length !== 3) throw new Error(`期望 3 个节点, 实际 ${nodes.length}`);
+    if (nodes[0].type !== 'vless' || nodes[1].type !== 'trojan' || nodes[2].type !== 'anytls') throw new Error('节点类型解析不匹配');
   });
 
   runTest('Protocol Parsers', 'Sing-box JSON 订阅格式解析与 Outbounds 提取', () => {

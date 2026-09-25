@@ -156,6 +156,19 @@ export function parseClashConfigDetailed(content: string): ClashParseResult {
           obfsPassword: p['obfs-password'],
         };
         nodes.push(baseNode);
+      } else if (type === 'anytls') {
+        baseNode.type = 'anytls';
+        baseNode.password = p.password;
+        baseNode.tls = true;
+        baseNode.sni = p.sni || p.servername;
+        baseNode.skipCertVerify = p['skip-cert-verify'];
+        if (p['client-fingerprint'] || p.fingerprint) {
+          baseNode.fingerprint = p['client-fingerprint'] || p.fingerprint;
+        }
+        if (p.alpn) {
+          baseNode.alpn = Array.isArray(p.alpn) ? p.alpn : [p.alpn];
+        }
+        nodes.push(baseNode);
       } else {
         skippedTypes[type] = (skippedTypes[type] || 0) + 1;
       }

@@ -101,6 +101,14 @@ export function parseSingboxConfigDetailed(content: string): SingboxParseResult 
           baseNode.skipCertVerify = ob.tls.insecure;
         }
         nodes.push(baseNode);
+      } else if (type === 'anytls') {
+        baseNode.password = ob.password;
+        baseNode.tls = true;
+        if (ob.tls) {
+          baseNode.sni = ob.tls.server_name;
+          baseNode.skipCertVerify = ob.tls.insecure;
+        }
+        nodes.push(baseNode);
       } else {
         skippedTypes[type] = (skippedTypes[type] || 0) + 1;
       }

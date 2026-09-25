@@ -15,7 +15,7 @@ interface SkipCounters {
   malformed: Record<string, number>;
 }
 
-const SUPPORTED_URI_SCHEMES = new Set(['vless', 'vmess', 'trojan', 'ss', 'hysteria2', 'hy2']);
+const SUPPORTED_URI_SCHEMES = new Set(['vless', 'vmess', 'trojan', 'ss', 'hysteria2', 'hy2', 'anytls']);
 
 function mergeCounter(target: Record<string, number>, source: Record<string, number>) {
   for (const [k, v] of Object.entries(source)) {
