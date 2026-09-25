@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 

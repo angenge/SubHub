@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx watch src/server/dev.ts",
-    "build": "node -e \"import('fs').then(fs => { fs.mkdirSync('public', {recursive:true}); fs.copyFileSync('agent/probe.js', 'public/probe.js'); })\" && vite build && tsc -p tsconfig.server.json",
+    "build": "node -e \"import('fs').then(fs => { fs.rmSync('dist', {recursive:true, force:true}); fs.mkdirSync('public', {recursive:true}); fs.copyFileSync('agent/probe.js', 'public/probe.js'); })\" && vite build && tsc -p tsconfig.server.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "start": "node dist/server/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
@@ -28,6 +29,7 @@
     "yaml": "^2.7.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260924.1",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.4",
     "@types/node-cron": "^3.0.11",

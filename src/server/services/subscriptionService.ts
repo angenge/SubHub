@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { parseNodesFromContentDetailed, parseSubscriptionUserInfo } from '../../core/parsers/index.js';
 import { ProxyNode } from '../../core/types/index.js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import net from 'net';
 
 const DEFAULT_UA = 'ClashMeta/v1.18.0 (SubHub Aggregator)';

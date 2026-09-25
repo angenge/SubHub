@@ -4,7 +4,7 @@ import { getAllNodes, batchUpdatePingResults } from './nodeService.js';
 import { PingResult } from '../../core/types/index.js';
 import { convertToClashProxyObject } from '../../core/converters/toClash.js';
 import YAML from 'yaml';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 export interface AgentConfig {
   secret: string;

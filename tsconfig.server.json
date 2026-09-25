@@ -8,5 +8,6 @@
     "noEmit": false,
     "allowImportingTsExtensions": false
   },
-  "include": ["src/server/**/*", "src/core/**/*"]
+  "include": ["src/server/**/*", "src/core/**/*"],
+  "exclude": ["src/core/__tests__"]
 }

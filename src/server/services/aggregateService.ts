@@ -11,7 +11,7 @@ import {
   generateLoonConfig,
   generateBase64Subscription,
 } from '../../core/converters/index.js';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 const SETTING_CLASH_SECRET = 'clash_api_secret';
 
