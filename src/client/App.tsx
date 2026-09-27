@@ -4,6 +4,7 @@ import { OverviewTab } from './pages/OverviewTab.js';
 import { SubscriptionsTab } from './pages/SubscriptionsTab.js';
 import { NodesTab } from './pages/NodesTab.js';
 import { AggregatesTab } from './pages/AggregatesTab.js';
+import { DashboardTab } from './pages/DashboardTab.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { SubscriptionModal } from './components/SubscriptionModal.js';
 import { AggregateModal } from './components/AggregateModal.js';
@@ -46,9 +47,15 @@ export const App: React.FC = () => {
 
   // Business state
   const [currentTab, setCurrentTab] = useState<TabType>(() => {
+    // Check url hash first
     const hash = window.location.hash.replace('#', '');
-    if (['overview', 'subscriptions', 'nodes', 'aggregates'].includes(hash)) {
+    if (['overview', 'subscriptions', 'nodes', 'aggregates', 'dashboard'].includes(hash)) {
       return hash as TabType;
+    }
+    // Check saved tab in localStorage
+    const saved = localStorage.getItem('subhub_active_tab');
+    if (saved && ['overview', 'subscriptions', 'nodes', 'aggregates', 'dashboard'].includes(saved)) {
+      return saved as TabType;
     }
     return 'overview';
   });
@@ -56,6 +63,10 @@ export const App: React.FC = () => {
   const handleSelectTab = (tab: TabType) => {
     setCurrentTab(tab);
     window.location.hash = tab;
+    localStorage.setItem('subhub_active_tab', tab);
+    if (tab === 'dashboard') {
+      setHasVisitedDashboard(true);
+    }
   };
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -81,6 +92,9 @@ export const App: React.FC = () => {
   const [exportAgg, setExportAgg] = useState<AggregateGroup | null>(null);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [hasVisitedDashboard, setHasVisitedDashboard] = useState<boolean>(() => {
+    return window.location.hash.replace('#', '') === 'dashboard';
+  });
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
@@ -120,8 +134,12 @@ export const App: React.FC = () => {
 
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (['overview', 'subscriptions', 'nodes', 'aggregates'].includes(hash)) {
+      if (['overview', 'subscriptions', 'nodes', 'aggregates', 'dashboard'].includes(hash)) {
         setCurrentTab(hash as TabType);
+        localStorage.setItem('subhub_active_tab', hash);
+        if (hash === 'dashboard') {
+          setHasVisitedDashboard(true);
+        }
       }
     };
 
@@ -545,6 +563,13 @@ export const App: React.FC = () => {
                 onExport={setExportAgg}
                 onToggleEnabled={handleToggleAggEnabled}
               />
+            )}
+
+            {/* Keep-Alive for Dashboard: Mounted once visited, hidden via CSS when switching away */}
+            {hasVisitedDashboard && (
+              <div className={currentTab === 'dashboard' ? 'block w-full h-full' : 'hidden'}>
+                <DashboardTab aggregates={aggregates} />
+              </div>
             )}
           </>
         )}

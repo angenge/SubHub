@@ -91,10 +91,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 mb-4 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-2 mb-4 border-b border-slate-800 pb-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('links')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 whitespace-nowrap shrink-0 ${
               activeTab === 'links'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -104,14 +104,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, aggre
           </button>
           <button
             onClick={() => setActiveTab('server')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'server'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
             }`}
           >
             <Server className="w-3.5 h-3.5" />
-            <span>🚀 VPS / 本地 Sing-box 服务部署 (Socks5+HTTP混用)</span>
+            <span className="sm:hidden">🚀 VPS 服务部署</span>
+            <span className="hidden sm:inline">🚀 VPS / 本地 Sing-box 服务部署 (Socks5+HTTP混用)</span>
           </button>
         </div>
 

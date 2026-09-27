@@ -246,3 +246,34 @@ export async function clearSyncLogs(subscriptionId?: string): Promise<void> {
   const url = subscriptionId ? `${API_BASE}/sync-logs?subscriptionId=${subscriptionId}` : `${API_BASE}/sync-logs`;
   await safeFetchJson<void>(url, { method: 'DELETE' });
 }
+
+export async function getGatewayClashSecret(): Promise<string> {
+  const res = await safeFetchJson<{ secret: string }>(`${API_BASE}/gateway/clash-secret`);
+  return res.secret;
+}
+
+export async function rotateGatewayClashSecret(): Promise<string> {
+  const res = await safeFetchJson<{ secret: string }>(`${API_BASE}/gateway/clash-secret/rotate`, { method: 'POST' });
+  return res.secret;
+}
+
+export interface DashboardConnectionConfig {
+  protocol: 'http' | 'https';
+  host: string;
+  port: string;
+  secret: string;
+}
+
+export async function getDashboardConnectionConfig(): Promise<DashboardConnectionConfig> {
+  return safeFetchJson<DashboardConnectionConfig>(`${API_BASE}/gateway/dashboard-config`);
+}
+
+export async function saveDashboardConnectionConfig(config: Partial<DashboardConnectionConfig>): Promise<DashboardConnectionConfig> {
+  return safeFetchJson<DashboardConnectionConfig>(`${API_BASE}/gateway/dashboard-config`, {
+    method: 'POST',
+    body: JSON.stringify(config),
+  });
+}
+
+
+

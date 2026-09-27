@@ -93,28 +93,30 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-2.5 mb-4 pr-8 shrink-0">
-          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+        <div className="flex items-start gap-3 mb-4 pr-8 shrink-0">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
             <Radio className="w-5 h-5" />
           </div>
-          <div>
-            <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-              <span>边缘探针服务配置 (Edge Probe Agent)</span>
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                边缘探针服务配置
+              </h3>
               {config && (
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1.5 shrink-0 ${
                     config.isOnline
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                       : 'bg-slate-800 text-slate-400 border border-slate-700'
                   }`}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${config.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-                  {config.isOnline ? '探针在线' : '等待探针连接'}
+                  <span>{config.isOnline ? '探针在线' : '等待连接'}</span>
                 </span>
               )}
-            </h3>
-            <p className="text-[11px] sm:text-xs text-slate-400">
-              在本地软路由、NAS 或个人电脑上运行探针，获得真实本地宽带环境下的精准测速与连通性
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
+              在软路由、NAS 或个人电脑上运行探针，基于本地真实宽带进行精准测速与连通性监测
             </p>
           </div>
         </div>
@@ -212,15 +214,15 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
 
             {/* Option 1: Node.js */}
             <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] font-semibold text-slate-300">
                 <span className="flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>方式一：Node.js 本地单文件运行（全自动装载 Mihomo 内核，开箱即用）</span>
+                  <Cpu className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>方式一：Node.js 本地单文件运行（全自动装载 Mihomo 内核）</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopy(nodeCommand, 'node')}
-                  className="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 active:scale-95"
+                  className="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 active:scale-95 self-end sm:self-auto shrink-0"
                 >
                   {copiedField === 'node' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedField === 'node' ? '已复制' : '复制命令'}</span>
@@ -233,15 +235,15 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
 
             {/* Option 2: Docker */}
             <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] font-semibold text-slate-300">
                 <span className="flex items-center gap-1.5">
-                  <Server className="w-3.5 h-3.5 text-sky-400" />
-                  <span>方式二：Docker 一键全自动常驻（自动装载 Mihomo 内核，适合 NAS / 软路由）</span>
+                  <Server className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  <span>方式二：Docker 一键全自动常驻（适合 NAS / 软路由）</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopy(dockerCommand, 'docker')}
-                  className="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 active:scale-95"
+                  className="text-xs text-sky-400 hover:text-sky-300 transition flex items-center gap-1 active:scale-95 self-end sm:self-auto shrink-0"
                 >
                   {copiedField === 'docker' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedField === 'docker' ? '已复制' : '复制命令'}</span>
@@ -255,11 +257,11 @@ export const ProbeModal: React.FC<ProbeModalProps> = ({ isOpen, onClose, onSecre
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800 text-xs text-slate-400 shrink-0">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 mt-3 border-t border-slate-800 text-xs text-slate-400 shrink-0 text-center sm:text-left">
           <span>💡 探针测速数据上报后，聚合订阅将自动按本地真实网络质量分发节点。</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition active:scale-95"
+            className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition active:scale-95"
           >
             完成
           </button>

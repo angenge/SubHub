@@ -655,7 +655,13 @@ function scheduleNextCycle() {
         scheduleNextCycle();
       }
     }, INTERVAL_MINUTES * 60 * 1000);
+    return;
   }
+
+  // 单次模式（INTERVAL_MINUTES=0）：本轮测速结束后显式退出，
+  // 否则后台 Mihomo 子进程会持续占住事件循环导致进程挂死；
+  // 退出钩子会自动关闭已启动的 Mihomo 内核。
+  cleanupAndExit(0);
 }
 
 async function main() {

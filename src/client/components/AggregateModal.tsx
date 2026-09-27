@@ -355,30 +355,38 @@ export const AggregateModal: React.FC<AggregateModalProps> = ({
                 暂未添加重命名规则（支持正则表达式，按序执行替换）
               </div>
             ) : (
-              <div className="space-y-2 max-h-36 overflow-y-auto p-1">
+              <div className="space-y-2 max-h-40 overflow-y-auto p-1">
                 {renameRules.map((rule, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="匹配正则 (如: 香港0(\d+))"
-                      value={rule.pattern}
-                      onChange={(e) => handleUpdateRenameRule(idx, 'pattern', e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus:border-indigo-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="替换为 (如: HK VIP $1)"
-                      value={rule.replace}
-                      onChange={(e) => handleUpdateRenameRule(idx, 'replace', e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus:border-indigo-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRenameRule(idx)}
-                      className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-xl bg-slate-950/60 sm:bg-transparent border border-slate-800/60 sm:border-0"
+                  >
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        type="text"
+                        placeholder="匹配正则 (如: 香港0(\d+))"
+                        value={rule.pattern}
+                        onChange={(e) => handleUpdateRenameRule(idx, 'pattern', e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus:border-indigo-500 font-mono"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-1">
+                      <input
+                        type="text"
+                        placeholder="替换为 (如: HK VIP $1)"
+                        value={rule.replace}
+                        onChange={(e) => handleUpdateRenameRule(idx, 'replace', e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-100 placeholder:text-slate-600 outline-none focus:border-indigo-500 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRenameRule(idx)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition active:scale-95 shrink-0"
+                        title="删除该条规则"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

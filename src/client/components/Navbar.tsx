@@ -1,8 +1,8 @@
 import React from 'react';
-import { Layers, Activity, Radio, Shuffle, RefreshCw, KeyRound, LogOut } from 'lucide-react';
+import { Layers, Activity, Radio, Shuffle, RefreshCw, KeyRound, LogOut, Sliders } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 
-export type TabType = 'overview' | 'subscriptions' | 'nodes' | 'aggregates';
+export type TabType = 'overview' | 'subscriptions' | 'nodes' | 'aggregates' | 'dashboard';
 
 interface NavbarProps {
   currentTab: TabType;
@@ -28,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'subscriptions', label: '订阅源', fullLabel: '订阅源管理', icon: Radio },
     { id: 'nodes', label: '节点', fullLabel: '节点工作台', icon: Layers },
     { id: 'aggregates', label: '聚合', fullLabel: '聚合分发中心', icon: Shuffle },
+    { id: 'dashboard', label: '控制台', fullLabel: '节点控制台', icon: Sliders },
   ];
 
   return (
@@ -35,23 +36,29 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Top Header */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 ring-1 ring-white/20 shrink-0">
+          {/* Brand & Logo (Clickable to Home/Overview) */}
+          <button
+            onClick={() => onSelectTab('overview')}
+            className="flex items-center gap-2.5 sm:gap-3 group text-left cursor-pointer transition active:scale-95 focus:outline-none"
+            title="返回状态概览"
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 ring-1 ring-white/20 shrink-0 group-hover:scale-105 group-hover:shadow-sky-500/40 transition-all duration-200">
               <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="font-bold text-base sm:text-lg text-white tracking-tight">SubHub</span>
+                <span className="font-bold text-base sm:text-lg text-white tracking-tight group-hover:text-sky-300 transition-colors">
+                  SubHub
+                </span>
                 <span className="px-1.5 py-0.2 sm:py-0.5 rounded text-[9px] sm:text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
                   v1.0
                 </span>
               </div>
-              <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block truncate sm:max-w-none">
+              <p className="text-[10px] sm:text-xs text-slate-400 group-hover:text-slate-300 hidden sm:block truncate sm:max-w-none transition-colors">
                 订阅聚合与节点探针
               </p>
             </div>
-          </div>
+          </button>
 
           {/* Desktop & Pad Navigation Tabs */}
           <nav className="hidden md:flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">

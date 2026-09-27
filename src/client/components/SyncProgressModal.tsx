@@ -53,7 +53,7 @@ export const SyncProgressModal: React.FC<SyncProgressModalProps> = ({ isOpen, on
 
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
           >
             <X className="w-5 h-5" />
           </button>
@@ -118,11 +118,11 @@ export const SyncProgressModal: React.FC<SyncProgressModalProps> = ({ isOpen, on
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-500">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-slate-800 text-xs text-slate-500 text-center sm:text-left">
           <span>💡 支持多机场高并发同时更新与自动降级保护</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition"
+            className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition active:scale-95"
           >
             {progress.isFinished ? '完成' : '后台运行'}
           </button>

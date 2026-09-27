@@ -69,7 +69,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-6 text-slate-100 my-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
@@ -178,21 +178,21 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
                 >
                   取消
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30 transition disabled:opacity-50"
+                  className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-600/30 transition active:scale-95 disabled:opacity-50"
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  确认修改
+                  <span>确认修改</span>
                 </button>
               </div>
             </form>

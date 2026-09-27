@@ -240,10 +240,10 @@ export const NodesTab: React.FC<NodesTabProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5 sm:gap-3">
+      <div className="p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5 sm:space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3">
           {/* Search input */}
-          <div className="sm:col-span-2 md:col-span-2 relative">
+          <div className="col-span-2 sm:col-span-2 md:col-span-2 relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -255,11 +255,11 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </div>
 
           {/* Subscription select */}
-          <div>
+          <div className="col-span-2 sm:col-span-1 md:col-span-1">
             <select
               value={selectedSubscriptionId || 'all'}
               onChange={(e) => onSelectSubscription(e.target.value === 'all' ? undefined : e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none focus:border-emerald-500"
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 outline-none focus:border-emerald-500 truncate"
             >
               <option value="all">全部可用订阅 ({activeSubscriptions.length})</option>
               {activeSubscriptions.map((s) => (
@@ -271,7 +271,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </div>
 
           {/* Protocol select */}
-          <div>
+          <div className="col-span-1 sm:col-span-1 md:col-span-1">
             <select
               value={selectedProtocol}
               onChange={(e) => setSelectedProtocol(e.target.value)}
@@ -287,7 +287,7 @@ export const NodesTab: React.FC<NodesTabProps> = ({
           </div>
 
           {/* Country select */}
-          <div>
+          <div className="col-span-1 sm:col-span-1 md:col-span-1">
             <select
               value={selectedCountry}
               onChange={(e) => setSelectedCountry(e.target.value)}

@@ -71,11 +71,11 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, a
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-      <div className="relative w-full max-w-3xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 space-y-4 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-4 sm:p-6 text-slate-100 space-y-4 my-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
@@ -133,8 +133,8 @@ export const AuditLogModal: React.FC<AuditLogModalProps> = ({ isOpen, onClose, a
             暂无此聚合订阅的访问调用记录
           </div>
         ) : (
-          <div className="rounded-xl bg-slate-950 border border-slate-800 overflow-hidden">
-            <div className="max-h-96 overflow-y-auto">
+          <div className="rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto">
+            <div className="max-h-96 overflow-y-auto min-w-[620px]">
               <table className="w-full text-left text-xs text-slate-300">
                 <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-mono text-[11px]">
                   <tr>

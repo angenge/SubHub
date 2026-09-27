@@ -14,6 +14,60 @@ import {
 import crypto from 'node:crypto';
 
 const SETTING_CLASH_SECRET = 'clash_api_secret';
+const SETTING_DASHBOARD_CONFIG = 'dashboard_connection_config';
+
+export interface DashboardConnectionConfig {
+  protocol: 'http' | 'https';
+  host: string;
+  port: string;
+  secret: string;
+}
+
+export async function getDashboardConnectionConfig(): Promise<DashboardConnectionConfig> {
+  const secret = await getOrInitClashSecret();
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, SETTING_DASHBOARD_CONFIG));
+  const existing = rows[0];
+  if (existing && existing.value) {
+    try {
+      const parsed = JSON.parse(existing.value);
+      return {
+        protocol: parsed.protocol === 'https' ? 'https' : 'http',
+        host: parsed.host || '',
+        port: parsed.port || '9090',
+        secret: parsed.secret !== undefined ? parsed.secret : secret,
+      };
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    protocol: 'http',
+    host: '',
+    port: '9090',
+    secret,
+  };
+}
+
+export async function saveDashboardConnectionConfig(config: Partial<DashboardConnectionConfig>): Promise<DashboardConnectionConfig> {
+  const current = await getDashboardConnectionConfig();
+  const updated: DashboardConnectionConfig = {
+    protocol: config.protocol === 'https' ? 'https' : (config.protocol === 'http' ? 'http' : current.protocol),
+    host: config.host !== undefined ? config.host.trim() : current.host,
+    port: config.port !== undefined ? config.port.trim() : current.port,
+    secret: config.secret !== undefined ? config.secret.trim() : current.secret,
+  };
+
+  const now = new Date().toISOString();
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, SETTING_DASHBOARD_CONFIG));
+  if (rows[0]) {
+    await db.update(schema.settings).set({ value: JSON.stringify(updated), updatedAt: now }).where(eq(schema.settings.key, SETTING_DASHBOARD_CONFIG));
+  } else {
+    await db.insert(schema.settings).values({ key: SETTING_DASHBOARD_CONFIG, value: JSON.stringify(updated), updatedAt: now });
+  }
+
+  return updated;
+}
 
 export async function getOrInitClashSecret(): Promise<string> {
   const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, SETTING_CLASH_SECRET));

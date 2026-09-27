@@ -106,20 +106,20 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      <h3 className={`font-semibold text-sm sm:text-base tracking-tight truncate max-w-[200px] sm:max-w-xs ${isDisabled ? 'text-slate-400 line-through' : 'text-white'}`}>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                      <h3 className={`font-semibold text-sm sm:text-base tracking-tight truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs ${isDisabled ? 'text-slate-400 line-through' : 'text-white'}`}>
                         {sub.name}
                       </h3>
                       {isDisabled ? (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
                           已禁用
                         </span>
                       ) : sub.status === 'error' ? (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
                           失败
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
                           正常
                         </span>
                       )}
@@ -128,7 +128,7 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                     {onToggleStatus && (
                       <button
                         onClick={() => onToggleStatus(sub)}

@@ -200,14 +200,16 @@ const SINGBOX_RESERVED_TAGS = new Set([
   'mixed-in',
   'cf-dns',
   'local-dns',
+  'local-doh',
   '节点选择',
+  '自动优选',
   '节点探针',
 ]);
 
 export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenerateOptions = {}): string {
   const mixedPort = options.mixedPort || 1080;
   const listenAddress = options.listenAddress || '0.0.0.0';
-  const testInterval = options.testInterval || '15m';
+  const testInterval = options.testInterval || '5m';
   const testTolerance = options.testTolerance !== undefined ? options.testTolerance : 50;
 
   const safeNodes = nodes.map((n) => {
@@ -238,14 +240,12 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
     {
       type: 'selector',
       tag: '节点选择',
-      outbounds: [...nodeTags, 'direct'],
-      default: nodeTags[0] || 'direct',
+      outbounds: ['自动优选', ...nodeTags, 'direct'],
+      default: '自动优选',
     },
     {
-      // Probe-only group: feeds latency ranking data via Clash API history,
-      // never routed to, so it does NOT auto-select real traffic.
       type: 'urltest',
-      tag: '节点探针',
+      tag: '自动优选',
       outbounds: fallbackTags,
       url: 'http://cp.cloudflare.com/generate_204',
       interval: testInterval,
@@ -269,21 +269,21 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs',
-      download_detour: '节点选择',
+      download_detour: '自动优选',
     },
     {
       tag: 'geosite-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
-      download_detour: '节点选择',
+      download_detour: '自动优选',
     },
     {
       tag: 'geoip-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
-      download_detour: '节点选择',
+      download_detour: '自动优选',
     },
   ];
 
@@ -336,7 +336,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
           server: '1.1.1.1',
           server_port: 443,
           path: '/dns-query',
-          detour: '节点选择',
+          detour: '自动优选',
         },
         {
           tag: 'local-dns',
@@ -348,6 +348,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       rules: dnsRules,
       final: 'cf-dns',
       strategy: 'ipv4_only',
+      cache_capacity: 4096,
     },
     inbounds,
     outbounds,

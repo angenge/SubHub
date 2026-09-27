@@ -94,9 +94,9 @@ export const AggregatesTab: React.FC<AggregatesTabProps> = ({
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-white text-sm sm:text-base tracking-tight truncate max-w-[200px] sm:max-w-xs">{agg.name}</h3>
-                      <span className="px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase font-mono">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                      <h3 className="font-semibold text-white text-sm sm:text-base tracking-tight truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs">{agg.name}</h3>
+                      <span className="px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase font-mono shrink-0">
                         {agg.targetFormat}
                       </span>
                       {agg.enabled ? (
@@ -111,7 +111,7 @@ export const AggregatesTab: React.FC<AggregatesTabProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                     <button
                       onClick={() => onExport(agg)}
                       className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition active:scale-95"

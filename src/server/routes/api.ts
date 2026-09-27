@@ -25,6 +25,8 @@ import {
   clearAggregateLogs,
   getOrInitClashSecret,
   rotateClashSecret,
+  getDashboardConnectionConfig,
+  saveDashboardConnectionConfig,
 } from '../services/aggregateService.js';
 import { getDashboardStats } from '../services/statsService.js';
 import { getSystemCapabilities } from '../config/capabilities.js';
@@ -462,7 +464,26 @@ api.delete('/aggregates/:id/logs', async (c) => {
   }
 });
 
-// ================= Sing-box Clash API Dashboard Secret (Protected by Admin Auth) =================
+// ================= Sing-box Clash API Dashboard Secret & Config (Protected by Admin Auth) =================
+api.get('/gateway/dashboard-config', async (c) => {
+  try {
+    const config = await getDashboardConnectionConfig();
+    return c.json({ success: true, data: config });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+api.post('/gateway/dashboard-config', async (c) => {
+  try {
+    const body = await c.req.json();
+    const updated = await saveDashboardConnectionConfig(body);
+    return c.json({ success: true, data: updated, message: '控制台连接配置已成功保存' });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
 api.get('/gateway/clash-secret', async (c) => {
   try {
     const secret = await getOrInitClashSecret();
