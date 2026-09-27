@@ -90,6 +90,15 @@ api.get('/system/capabilities', (c) => {
   return c.json({ success: true, data: capabilities });
 });
 
+// Metacubexd Control Center probe fallback (Public)
+api.get('/control/info', (c) => {
+  return c.json({
+    enabled: false,
+    platform: 'subhub',
+    version: '1.0.0',
+  });
+});
+
 // ================= Auth Routes (Public) =================
 api.get('/auth/status', async (c) => {
   const status = await getAuthStatus();
@@ -198,7 +207,13 @@ api.post('/auth/change-password', async (c) => {
 
 // ================= Auth Middleware for Protected API =================
 api.use('*', async (c, next) => {
-  if (c.req.path.startsWith('/auth') || c.req.path.startsWith('/system') || c.req.path.startsWith('/agent/nodes') || c.req.path.startsWith('/agent/report')) {
+  if (
+    c.req.path.startsWith('/auth') ||
+    c.req.path.startsWith('/system') ||
+    c.req.path.startsWith('/control') ||
+    c.req.path.startsWith('/agent/nodes') ||
+    c.req.path.startsWith('/agent/report')
+  ) {
     return next();
   }
 
