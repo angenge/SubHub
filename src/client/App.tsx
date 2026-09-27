@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar, TabType } from './components/Navbar.js';
 import { OverviewTab } from './pages/OverviewTab.js';
-import { SubscriptionsTab } from './pages/SubscriptionsTab.js';
-import { NodesTab } from './pages/NodesTab.js';
-import { AggregatesTab } from './pages/AggregatesTab.js';
-import { DashboardTab } from './pages/DashboardTab.js';
 import { LoginPage } from './pages/LoginPage.js';
-import { SubscriptionModal } from './components/SubscriptionModal.js';
-import { AggregateModal } from './components/AggregateModal.js';
-import { ExportModal } from './components/ExportModal.js';
-import { ChangePasswordModal } from './components/ChangePasswordModal.js';
-import { ProbeModal } from './components/ProbeModal.js';
-import { SyncProgressModal, SyncProgressState, SyncItemLog } from './components/SyncProgressModal.js';
+
+// Lazy loaded heavy tabs and modals to optimize initial bundle size
+const SubscriptionsTab = lazy(() => import('./pages/SubscriptionsTab.js').then(m => ({ default: m.SubscriptionsTab })));
+const NodesTab = lazy(() => import('./pages/NodesTab.js').then(m => ({ default: m.NodesTab })));
+const AggregatesTab = lazy(() => import('./pages/AggregatesTab.js').then(m => ({ default: m.AggregatesTab })));
+const DashboardTab = lazy(() => import('./pages/DashboardTab.js').then(m => ({ default: m.DashboardTab })));
+
+const SubscriptionModal = lazy(() => import('./components/SubscriptionModal.js').then(m => ({ default: m.SubscriptionModal })));
+const AggregateModal = lazy(() => import('./components/AggregateModal.js').then(m => ({ default: m.AggregateModal })));
+const ExportModal = lazy(() => import('./components/ExportModal.js').then(m => ({ default: m.ExportModal })));
+const ChangePasswordModal = lazy(() => import('./components/ChangePasswordModal.js').then(m => ({ default: m.ChangePasswordModal })));
+const ProbeModal = lazy(() => import('./components/ProbeModal.js').then(m => ({ default: m.ProbeModal })));
+const SyncProgressModal = lazy(() => import('./components/SyncProgressModal.js').then(m => ({ default: m.SyncProgressModal })));
+
+// Loading spinner fallback for lazy chunks
+const TabFallback: React.FC = () => (
+  <div className="flex flex-col items-center justify-center py-20 gap-3">
+    <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    <span className="text-xs text-slate-500 animate-pulse">正在载入组件...</span>
+  </div>
+);
 import {
   checkAuthStatus,
   getCapabilities,
@@ -513,64 +524,66 @@ export const App: React.FC = () => {
               />
             )}
 
-            {currentTab === 'subscriptions' && (
-              <SubscriptionsTab
-                subscriptions={subscriptions}
-                onAdd={() => {
-                  setEditingSub(null);
-                  setIsSubModalOpen(true);
-                }}
-                onEdit={(sub) => {
-                  setEditingSub(sub);
-                  setIsSubModalOpen(true);
-                }}
-                onToggleStatus={handleToggleSubStatus}
-                onDelete={handleDeleteSub}
-                onRefresh={handleRefreshSub}
-                onViewNodes={handleViewNodesForSub}
-              />
-            )}
+            <Suspense fallback={<TabFallback />}>
+              {currentTab === 'subscriptions' && (
+                <SubscriptionsTab
+                  subscriptions={subscriptions}
+                  onAdd={() => {
+                    setEditingSub(null);
+                    setIsSubModalOpen(true);
+                  }}
+                  onEdit={(sub) => {
+                    setEditingSub(sub);
+                    setIsSubModalOpen(true);
+                  }}
+                  onToggleStatus={handleToggleSubStatus}
+                  onDelete={handleDeleteSub}
+                  onRefresh={handleRefreshSub}
+                  onViewNodes={handleViewNodesForSub}
+                />
+              )}
 
-            {currentTab === 'nodes' && (
-              <NodesTab
-                nodes={nodes}
-                subscriptions={subscriptions}
-                enableTcpPing={capabilities?.features.tcpPing !== false}
-                selectedSubscriptionId={selectedSubIdForNodes}
-                onSelectSubscription={setSelectedSubIdForNodes}
-                onPingNode={handlePingNode}
-                onPingAll={handlePingAllNodes}
-                onDeleteNode={handleDeleteNode}
-                onOpenProbeConfig={() => setIsProbeModalOpen(true)}
-                probeOnline={probeOnline}
-              />
-            )}
+              {currentTab === 'nodes' && (
+                <NodesTab
+                  nodes={nodes}
+                  subscriptions={subscriptions}
+                  enableTcpPing={capabilities?.features.tcpPing !== false}
+                  selectedSubscriptionId={selectedSubIdForNodes}
+                  onSelectSubscription={setSelectedSubIdForNodes}
+                  onPingNode={handlePingNode}
+                  onPingAll={handlePingAllNodes}
+                  onDeleteNode={handleDeleteNode}
+                  onOpenProbeConfig={() => setIsProbeModalOpen(true)}
+                  probeOnline={probeOnline}
+                />
+              )}
 
-            {currentTab === 'aggregates' && (
-              <AggregatesTab
-                aggregates={aggregates}
-                subscriptions={subscriptions}
-                onAdd={() => {
-                  setEditingAgg(null);
-                  setIsAggModalOpen(true);
-                }}
-                onEdit={(agg) => {
-                  setEditingAgg(agg);
-                  setIsAggModalOpen(true);
-                }}
-                onDelete={handleDeleteAgg}
-                onRotateToken={handleRotateToken}
-                onExport={setExportAgg}
-                onToggleEnabled={handleToggleAggEnabled}
-              />
-            )}
+              {currentTab === 'aggregates' && (
+                <AggregatesTab
+                  aggregates={aggregates}
+                  subscriptions={subscriptions}
+                  onAdd={() => {
+                    setEditingAgg(null);
+                    setIsAggModalOpen(true);
+                  }}
+                  onEdit={(agg) => {
+                    setEditingAgg(agg);
+                    setIsAggModalOpen(true);
+                  }}
+                  onDelete={handleDeleteAgg}
+                  onRotateToken={handleRotateToken}
+                  onExport={setExportAgg}
+                  onToggleEnabled={handleToggleAggEnabled}
+                />
+              )}
 
-            {/* Keep-Alive for Dashboard: Mounted once visited, hidden via CSS when switching away */}
-            {hasVisitedDashboard && (
-              <div className={currentTab === 'dashboard' ? 'block w-full h-full' : 'hidden'}>
-                <DashboardTab aggregates={aggregates} />
-              </div>
-            )}
+              {/* Keep-Alive for Dashboard: Mounted once visited, hidden via CSS when switching away */}
+              {hasVisitedDashboard && (
+                <div className={currentTab === 'dashboard' ? 'block w-full h-full' : 'hidden'}>
+                  <DashboardTab aggregates={aggregates} />
+                </div>
+              )}
+            </Suspense>
           </>
         )}
       </main>
@@ -580,57 +593,66 @@ export const App: React.FC = () => {
         <p>SubHub &copy; 2026 - 智能 VPN 订阅管理聚合与探针平台</p>
       </footer>
 
-      {/* Subscription Modal */}
-      <SubscriptionModal
-        isOpen={isSubModalOpen}
-        onClose={() => {
-          setIsSubModalOpen(false);
-          setEditingSub(null);
-        }}
-        onSubmit={handleCreateOrUpdateSub}
-        initialData={editingSub}
-      />
+      {/* Modals wrapped in Suspense for zero initial load impact */}
+      <Suspense fallback={null}>
+        {isSubModalOpen && (
+          <SubscriptionModal
+            isOpen={isSubModalOpen}
+            onClose={() => {
+              setIsSubModalOpen(false);
+              setEditingSub(null);
+            }}
+            onSubmit={handleCreateOrUpdateSub}
+            initialData={editingSub}
+          />
+        )}
 
-      {/* Aggregate Modal */}
-      <AggregateModal
-        isOpen={isAggModalOpen}
-        onClose={() => {
-          setIsAggModalOpen(false);
-          setEditingAgg(null);
-        }}
-        onSubmit={handleCreateOrUpdateAgg}
-        initialData={editingAgg}
-        subscriptions={subscriptions}
-      />
+        {isAggModalOpen && (
+          <AggregateModal
+            isOpen={isAggModalOpen}
+            onClose={() => {
+              setIsAggModalOpen(false);
+              setEditingAgg(null);
+            }}
+            onSubmit={handleCreateOrUpdateAgg}
+            initialData={editingAgg}
+            subscriptions={subscriptions}
+          />
+        )}
 
-      {/* Export Modal */}
-      <ExportModal
-        isOpen={!!exportAgg}
-        onClose={() => setExportAgg(null)}
-        aggregate={exportAgg}
-      />
+        {exportAgg && (
+          <ExportModal
+            isOpen={!!exportAgg}
+            onClose={() => setExportAgg(null)}
+            aggregate={exportAgg}
+          />
+        )}
 
-      {/* Change Password Modal */}
-      <ChangePasswordModal
-        isOpen={isChangePasswordModalOpen}
-        onClose={() => setIsChangePasswordModalOpen(false)}
-        onSuccess={() => showToast('密码修改成功')}
-        hasPasswordEnv={hasPasswordEnv}
-      />
+        {isChangePasswordModalOpen && (
+          <ChangePasswordModal
+            isOpen={isChangePasswordModalOpen}
+            onClose={() => setIsChangePasswordModalOpen(false)}
+            onSuccess={() => showToast('密码修改成功')}
+            hasPasswordEnv={hasPasswordEnv}
+          />
+        )}
 
-      {/* Probe Config Modal */}
-      <ProbeModal
-        isOpen={isProbeModalOpen}
-        onClose={() => setIsProbeModalOpen(false)}
-        onSecretChanged={loadAllData}
-      />
+        {isProbeModalOpen && (
+          <ProbeModal
+            isOpen={isProbeModalOpen}
+            onClose={() => setIsProbeModalOpen(false)}
+            onSecretChanged={loadAllData}
+          />
+        )}
 
-      {/* Sync Progress Modal */}
-      <SyncProgressModal
-        isOpen={isSyncModalOpen}
-        onClose={() => setIsSyncModalOpen(false)}
-        progress={syncProgress}
-      />
+        {isSyncModalOpen && (
+          <SyncProgressModal
+            isOpen={isSyncModalOpen}
+            onClose={() => setIsSyncModalOpen(false)}
+            progress={syncProgress}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

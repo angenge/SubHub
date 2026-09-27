@@ -35,12 +35,16 @@ app.route('/sub', subRouter);
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString(), platform: 'cloudflare' }));
 
-// Static Assets fallback (Workers Static Assets)
+// Static Assets fallback (Workers Static Assets with smart caching)
 app.all('*', async (c) => {
   if (c.env?.ASSETS) {
     const res = await c.env.ASSETS.fetch(c.req.raw);
-    const contentType = res.headers.get('content-type');
-    // Ensure charset=utf-8 is set for text/script assets to prevent browser mojibake (garbled Chinese characters)
+    const contentType = res.headers.get('content-type') || '';
+    const pathname = new URL(c.req.url).pathname;
+
+    const newHeaders = new Headers(res.headers);
+
+    // 1. Ensure charset=utf-8 for text/js/json to avoid browser character encoding issues
     if (
       contentType &&
       !contentType.includes('charset=') &&
@@ -48,15 +52,27 @@ app.all('*', async (c) => {
         contentType.includes('text/') ||
         contentType.includes('application/json'))
     ) {
-      const newHeaders = new Headers(res.headers);
       newHeaders.set('content-type', `${contentType}; charset=utf-8`);
-      return new Response(res.body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: newHeaders,
-      });
     }
-    return res;
+
+    // 2. Cache-Control policy:
+    // - Hashed static assets in /assets/ or /_nuxt/ -> Immutable long-term cache (1 year)
+    // - HTML files -> no-cache, always revalidate to fetch newest app version
+    if (
+      pathname.startsWith('/assets/') ||
+      pathname.startsWith('/ui/_nuxt/') ||
+      /\.(?:woff2?|ttf|eot|png|jpg|jpeg|svg|ico|webp)$/i.test(pathname)
+    ) {
+      newHeaders.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (contentType.includes('text/html') || pathname.endsWith('.html') || pathname === '/') {
+      newHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+
+    return new Response(res.body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: newHeaders,
+    });
   }
   return c.text('Not Found', 404);
 });
