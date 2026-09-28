@@ -1,4 +1,4 @@
-import { Subscription, ProxyNode, AggregateGroup, DashboardStats, PingResult, AccessLog, SyncLog, SystemCapabilities } from '../../core/types/index.js';
+import { Subscription, ProxyNode, AggregateGroup, DashboardStats, PingResult, AccessLog, SyncLog, SystemCapabilities, ClientAccessSummary } from '../../core/types/index.js';
 
 const API_BASE = '/api';
 const TOKEN_KEY = 'subhub_auth_token';
@@ -229,6 +229,14 @@ export async function rotateAggregateToken(id: string): Promise<AggregateGroup> 
 
 export async function getAggregateLogs(id: string): Promise<AccessLog[]> {
   return safeFetchJson<AccessLog[]>(`${API_BASE}/aggregates/${id}/logs`);
+}
+
+export async function getAggregateClients(id: string): Promise<ClientAccessSummary[]> {
+  return safeFetchJson<ClientAccessSummary[]>(`${API_BASE}/aggregates/${id}/clients`);
+}
+
+export async function getAllActiveClients(): Promise<Record<string, ClientAccessSummary[]>> {
+  return safeFetchJson<Record<string, ClientAccessSummary[]>>(`${API_BASE}/aggregates/active-clients`);
 }
 
 export async function clearAggregateLogs(id: string): Promise<void> {

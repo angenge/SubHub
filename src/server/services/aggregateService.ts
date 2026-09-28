@@ -1,6 +1,6 @@
 import { eq, desc, sql } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
-import { AggregateGroup, AccessLog } from '../../core/types/index.js';
+import { AggregateGroup, AccessLog, ClientAccessSummary, summarizeClientDevices } from '../../core/types/index.js';
 import { getAllNodes } from './nodeService.js';
 import { getAllSubscriptions } from './subscriptionService.js';
 import { processAggregateNodes } from '../../core/engine/index.js';
@@ -286,6 +286,33 @@ export async function getAggregateLogs(aggregateId: string, limit = 100): Promis
     accessedAt: r.accessedAt,
   }));
 }
+
+export async function getAggregateClients(aggregateId: string): Promise<ClientAccessSummary[]> {
+  const logs = await getAggregateLogs(aggregateId, 200);
+  return summarizeClientDevices(logs);
+}
+
+export async function getAllActiveClients(): Promise<Record<string, ClientAccessSummary[]>> {
+  const rows = await db.select()
+    .from(schema.accessLogs)
+    .orderBy(desc(schema.accessLogs.accessedAt))
+    .limit(500);
+
+  const logsByAggregate = new Map<string, any[]>();
+  for (const r of rows) {
+    if (!logsByAggregate.has(r.aggregateId)) {
+      logsByAggregate.set(r.aggregateId, []);
+    }
+    logsByAggregate.get(r.aggregateId)!.push(r);
+  }
+
+  const result: Record<string, ClientAccessSummary[]> = {};
+  for (const [aggId, aggLogs] of logsByAggregate.entries()) {
+    result[aggId] = summarizeClientDevices(aggLogs);
+  }
+  return result;
+}
+
 
 export async function clearAggregateLogs(aggregateId: string) {
   await db.delete(schema.accessLogs).where(eq(schema.accessLogs.aggregateId, aggregateId));

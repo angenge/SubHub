@@ -23,6 +23,8 @@ import {
   rotateAggregateToken,
   getAggregateLogs,
   clearAggregateLogs,
+  getAggregateClients,
+  getAllActiveClients,
   getOrInitClashSecret,
   rotateClashSecret,
   getDashboardConnectionConfig,
@@ -454,6 +456,25 @@ api.post('/aggregates/:id/rotate-token', async (c) => {
     const id = c.req.param('id');
     const updated = await rotateAggregateToken(id);
     return c.json({ success: true, data: updated });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+api.get('/aggregates/active-clients', async (c) => {
+  try {
+    const clients = await getAllActiveClients();
+    return c.json({ success: true, data: clients });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+api.get('/aggregates/:id/clients', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const clients = await getAggregateClients(id);
+    return c.json({ success: true, data: clients });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }

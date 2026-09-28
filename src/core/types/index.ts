@@ -197,3 +197,6 @@ export interface SystemCapabilities {
     d1Storage: boolean;
   };
 }
+
+export * from '../utils/clientParser.js';
+
