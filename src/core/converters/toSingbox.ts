@@ -297,7 +297,7 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       action: 'hijack-dns',
     },
     {
-      domain_suffix: ['hiz.one', 'subhub.hiz.one'],
+      domain_suffix: ['subhub.hiz.one'],
       outbound: 'direct',
     },
     {
