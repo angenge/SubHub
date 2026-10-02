@@ -269,21 +269,21 @@ export function generateSingboxConfig(nodes: ProxyNode[], options: SingboxGenera
       type: 'remote',
       format: 'binary',
       url: 'https://dl.hiz.one/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs',
-      download_detour: '自动优选',
+      download_detour: 'direct',
     },
     {
       tag: 'geosite-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://dl.hiz.one/https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
-      download_detour: '自动优选',
+      download_detour: 'direct',
     },
     {
       tag: 'geoip-cn',
       type: 'remote',
       format: 'binary',
       url: 'https://dl.hiz.one/https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
-      download_detour: '自动优选',
+      download_detour: 'direct',
     },
   ];
 
