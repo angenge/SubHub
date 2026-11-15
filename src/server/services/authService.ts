@@ -25,19 +25,35 @@ function normalizeToken(token?: string | null): string {
   return token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
 }
 
+async function readSessionSecret(): Promise<string | null> {
+  const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret'));
+  return rows[0]?.value ?? null;
+}
+
 async function getOrInitSecret(): Promise<string> {
   try {
-    const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, 'session_secret'));
-    const existing = rows[0];
-    if (existing && existing.value) {
-      return existing.value;
+    const existing = await readSessionSecret();
+    if (existing) {
+      return existing;
     }
+
     const newSecret = crypto.randomBytes(32).toString('hex');
     const now = new Date().toISOString();
-    await db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now });
-    return newSecret;
-  } catch {
-    return 'fallback_subhub_secret_key_fixed';
+    try {
+      await db.insert(schema.settings).values({ key: 'session_secret', value: newSecret, updatedAt: now });
+      return newSecret;
+    } catch (insertError) {
+      // Multiple instances may initialize the secret concurrently; use the winner's value.
+      const raced = await readSessionSecret();
+      if (raced) {
+        return raced;
+      }
+      throw insertError;
+    }
+  } catch (error) {
+    // Fail closed: without a persisted secret, token signing/verification must not continue.
+    console.error('[auth] Failed to load or initialize session secret:', error);
+    throw new Error('Session secret unavailable');
   }
 }
 

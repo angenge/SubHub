@@ -656,6 +656,28 @@ proxies:
     }
   });
 
+  await runAsyncTest('Security - Auth Fail Closed', '会话密钥不可用时拒绝签发/验证 Token（禁止可预测后备密钥）', async () => {
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    setDefaultDb(null);
+    try {
+      let rejected = false;
+      try {
+        await createSessionToken();
+      } catch (err: any) {
+        rejected = err.message === 'Session secret unavailable';
+      }
+      if (!rejected) throw new Error('数据库不可用时未按预期拒绝签发 Session Token');
+
+      if (await validateSessionToken('payload.signature')) {
+        throw new Error('数据库不可用时仍接受了未知 Session Token');
+      }
+    } finally {
+      setDefaultDb(testDb);
+      console.error = originalConsoleError;
+    }
+  });
+
   await runAsyncTest('Security & Integrity', '防止相同订阅链接与重复订阅名称重复添加 (Anti-Duplicate Check)', async () => {
     const { createSubscription, deleteSubscription } = await import('../../server/services/subscriptionService.js');
     const { createAggregate, deleteAggregate } = await import('../../server/services/aggregateService.js');
