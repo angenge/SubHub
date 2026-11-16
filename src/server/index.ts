@@ -38,11 +38,16 @@ if (fs.existsSync(clientDist)) {
       return c.text('Bad Request', 400);
     }
 
-    const filePath = path.resolve(clientDist, cleanPath);
+    let filePath = path.resolve(clientDist, cleanPath);
 
     // Verify filePath is strictly within clientDist directory
     if (!filePath.startsWith(clientDist + path.sep) && filePath !== clientDist) {
       return c.text('Forbidden', 403);
+    }
+
+    // Resolve directory paths to their index.html (e.g. /ui/ -> /ui/index.html)
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+      filePath = path.join(filePath, 'index.html');
     }
 
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
