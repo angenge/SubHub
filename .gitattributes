@@ -1,0 +1,31 @@
+# 统一换行符策略
+#
+# 原因：本项目部署目标是 Linux（Docker / Cloudflare Workers），仓库统一使用 LF。
+# 如果不显式声明，Windows 上开启 core.autocrlf=true 时，Git 会：
+#   1. 每次 git add 都打印 "LF will be replaced by CRLF" 警告；
+#   2. 跨平台协作时出现"整个文件都变了"的假 diff。
+# 声明 eol=lf 后，索引与工作区一律使用 LF，跨平台行为一致。
+* text=auto eol=lf
+
+# 明确声明二进制文件，避免被文本探测误判后损坏（图片、字体、数据库等）
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.icns  binary
+*.bmp   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+*.db    binary
+*.sqlite binary
+*.sqlite3 binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.7z    binary
