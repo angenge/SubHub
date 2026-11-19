@@ -37,7 +37,7 @@ SubHub 采用现代化的**「云端中枢调度 + 本地边缘真实探针」**
 │                                                             │
 │   [SubHub Probe Agent 探针客户端]                           │
 │   ├── 定时调度 (每 15 分钟触发一次)                          │
-│   ├── 高并发 TCP Ping 探针池 (25 线程, 3 秒测完上百节点)     │
+│   ├── 受控并发 URL-Test 探针池 (默认 3 并发, 8 秒超时)       │
 │   └── 本地宽带真实握手延迟测算 (电信 / 联通 / 移动 / 校园网) │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -47,7 +47,7 @@ SubHub 采用现代化的**「云端中枢调度 + 本地边缘真实探针」**
 ## ✨ 核心特性
 
 - 🚀 **全格式自动解析**
-  - 支持 **Clash (YAML)**、**Sing-box (JSON)**、**Base64** 编码及**原生节点 URI 列表**（VLESS、VMess、Trojan、Shadowsocks、Hysteria2）。
+  - 支持 **Clash (YAML)**、**Sing-box (JSON)**、**Base64** 编码及**原生节点 URI 列表**（VLESS、VMess、Trojan、Shadowsocks、Hysteria2、AnyTLS）。
   - 自动提取订阅响应头中的流量信息（已用/总量）及过期时间。
 - 📡 **三维立体测速与健康检测**
   - **边缘探针分布式测速**：在软路由/NAS 运行 `probe.js`，测算真实家用宽带延迟并自动剔除坏节点；
@@ -105,9 +105,13 @@ npx wrangler login
 # 创建 D1 数据库 (记录终端输出的 database_id)
 npx wrangler d1 create subhub-db
 
-# 执行数据库表结构初始化
+# 执行数据库表结构初始化 (两个迁移必须按顺序全部执行)
 npx wrangler d1 execute subhub-db --remote --file=./migrations/0000_init_d1.sql
+npx wrangler d1 execute subhub-db --remote --file=./migrations/0001_update_interval_180_and_skipped.sql
 ```
+
+> ⚠️ 请务必执行 **两个** 迁移脚本：`0001` 会新增 `sync_logs.skipped` / `skipped_detail` 两列，
+> 若遗漏，首次同步订阅时会报 `no such column: skipped`。
 
 #### 步骤 3：配置 `wrangler.jsonc`
 检查根目录下的 `wrangler.jsonc` 文件：
@@ -125,6 +129,13 @@ npx wrangler deploy
 ```
 
 部署完成后，即可通过你的自定义域名或 Cloudflare 提供的 Worker 域名直接访问！
+
+> 💡 *(可选)* 如需固定管理员密码（跳过网页初始化），在 Workers 上需通过 Secret 注入，
+> 而不是 `docker-compose.yml` 里的环境变量：
+> ```bash
+> npx wrangler secret put ADMIN_PASSWORD
+> ```
+> 设置后需重新 `npx wrangler deploy` 才会生效。
 
 ---
 
@@ -157,8 +168,9 @@ docker run -d \
 ### 方式三：本地 / Linux 服务器直接运行 (Node.js)
 
 #### 前置要求
-- **Node.js** >= 20.x 或 **Bun** >= 1.1.x
+- **Node.js** >= 20.x（推荐 22.x，Docker 镜像固定使用 `node:22-slim`）
 - **npm** / **pnpm**
+- 其他运行时（如 Bun）未经验证：本项目依赖 `better-sqlite3` 原生模块，非 Node 运行时可能需要额外编译
 
 #### 安装与启动
 ```bash
@@ -181,6 +193,16 @@ npm run dev
 # 另起终端启动后端 API 服务 (默认端口 3000)
 npm run dev:server
 ```
+
+#### 运行测试
+
+内置完整的核心引擎测试套件（协议解析、格式转换、过滤去重、改名、性能基准等）：
+
+```bash
+npm test
+```
+
+测试覆盖 `src/core/__tests__/comprehensive_suite.ts`，任意用例失败时进程以非 0 状态码退出。
 
 ---
 
@@ -217,7 +239,7 @@ SUBHUB_URL="https://your-subhub-domain.com" AGENT_SECRET="subprobe_your_secret_h
    - 进入「订阅源管理」页面，点击「添加订阅」，填入机场提供的订阅链接并保存；
    - 系统将自动拉取、解析全部节点信息并记录流量配额与到期时间。
 3. **创建聚合分发规则**：
-   - 进入「聚合中心」页面，点击「新建聚合」；
+   - 进入「聚合分发中心」页面，点击「新建聚合」；
    - 勾选订阅源，设置过滤条件（协议白名单、包含/排除关键词、延迟阈值、正则改名等）；
    - 保存后即可复制生成的专属聚合链接（`/sub/<Token>`）。
 4. **在客户端中导入**：
@@ -233,8 +255,20 @@ SUBHUB_URL="https://your-subhub-domain.com" AGENT_SECRET="subprobe_your_secret_h
 | `PORT` | `3000` | Node.js / Docker | 服务监听端口 |
 | `HOST` | `0.0.0.0` | Node.js / Docker | 服务监听主机地址 |
 | `DATA_DIR` | `./data` | Node.js / Docker | SQLite 数据库文件持久化路径 |
-| `ADMIN_PASSWORD` | *(空)* | 全平台 | 固定管理员密码（设置后跳过 Web 初始化） |
-| `ENABLE_TCP_PING` | *(自动)* | 全平台 | 服务端 TCP Ping 测速开关 (`true`/`false`) |
+| `ADMIN_PASSWORD` | *(空)* | 全平台 | 固定管理员密码（设置后跳过 Web 初始化）。Workers 上须通过 `npx wrangler secret put ADMIN_PASSWORD` 注入 |
+| `ENABLE_TCP_PING` | *(自动)* | 全平台 | 服务端 TCP Ping 测速开关 (`true`/`false`)。Cloudflare Workers 上默认关闭（`node:net` 出站 TCP 可用，但默认不启用） |
+| `TRUST_PROXY` | *(空)* | Node.js / Docker | 部署在反向代理（Nginx / Caddy / Cloudflare Tunnel）之后请设为 `true`，否则限流会把所有请求识别为同一个 IP |
+
+#### 边缘探针环境变量 (`agent/probe.js`)
+
+| 变量名 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `SUBHUB_URL` | *(必填)* | SubHub 实例地址，例如 `https://subhub.example.com` |
+| `AGENT_SECRET` | *(必填)* | 在「📡 边缘探针配置」中获取的专属探针密钥 |
+| `INTERVAL_MINUTES` | `15` | 每轮测速的间隔（分钟） |
+| `CONCURRENCY` | `3` | 节点测速并发数 |
+| `TIMEOUT_MS` | `8000` | 单节点 URL-Test 超时（毫秒） |
+| `FETCH_TIMEOUT_MS` | `15000` | 拉取待测节点列表的请求超时（毫秒） |
 
 ---
 
@@ -245,7 +279,8 @@ SUBHUB_URL="https://your-subhub-domain.com" AGENT_SECRET="subprobe_your_secret_h
 - **VMess** (TCP / WebSocket / gRPC)
 - **Trojan** (TLS / WebSocket / gRPC)
 - **Shadowsocks (SS)** (含 SIP002、v2ray-plugin、obfs 插件)
-- **Hysteria 2 (Hy2)** (含端口跳跃、Salamander 混淆)
+- **Hysteria 2 (Hy2)** (含 Salamander 混淆)
+- **AnyTLS** (含 uTLS 指纹 / ALPN)
 
 ### 支持的客户端导出格式
 - **Clash / Clash Meta (Mihomo)** (`target=clash`)

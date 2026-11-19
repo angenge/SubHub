@@ -8,6 +8,7 @@
     "dev:server": "tsx watch src/server/dev.ts",
     "build": "node -e \"import('fs').then(fs => { fs.rmSync('dist', {recursive:true, force:true}); fs.mkdirSync('public', {recursive:true}); fs.copyFileSync('agent/probe.js', 'public/probe.js'); })\" && vite build && tsc -p tsconfig.server.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
+    "test": "tsx src/core/__tests__/comprehensive_suite.ts",
     "start": "node dist/server/index.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
