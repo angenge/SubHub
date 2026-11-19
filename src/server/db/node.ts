@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema.js';
+import { setRawSqlite } from './index.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -130,5 +131,6 @@ export function initNodeDatabase() {
   `);
 
   const nodeDb = drizzle(sqlite, { schema });
+  setRawSqlite(sqlite);
   return { db: nodeDb, sqlite };
 }

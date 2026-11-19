@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Activity, Radio, Shuffle, RefreshCw, KeyRound, LogOut, Sliders } from 'lucide-react';
+import { Layers, Activity, Radio, Shuffle, RefreshCw, KeyRound, LogOut, Sliders, Settings } from 'lucide-react';
 import { cn } from '../lib/utils.js';
 
 export type TabType = 'overview' | 'subscriptions' | 'nodes' | 'aggregates' | 'dashboard';
@@ -12,6 +12,7 @@ interface NavbarProps {
   hasPasswordEnv?: boolean;
   onChangePasswordClick: () => void;
   onLogoutClick: () => void;
+  onSettingsClick: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,6 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   hasPasswordEnv,
   onChangePasswordClick,
   onLogoutClick,
+  onSettingsClick,
 }) => {
   const navItems = [
     { id: 'overview', label: '概览', fullLabel: '状态概览', icon: Activity },
@@ -97,6 +99,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <div className="h-4 sm:h-5 w-px bg-slate-800 mx-0.5 sm:mx-1" />
+
+            <button
+              onClick={onSettingsClick}
+              className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-slate-900 transition border border-transparent hover:border-slate-800 active:scale-95"
+              title="系统设置与数据备份"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
 
             <button
               onClick={onChangePasswordClick}

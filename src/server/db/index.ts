@@ -5,6 +5,23 @@ export const dbContext = new AsyncLocalStorage<any>();
 
 let defaultDb: any = null;
 
+/**
+ * Raw better-sqlite3 handle, registered only by the Node.js entry point.
+ * It stays null on Cloudflare Workers, which is how the backup service decides
+ * whether interactive transactions are available. Keeping the handle here (in
+ * a module both runtimes already import) avoids a static dependency on the
+ * native module, which would break the Workers bundle.
+ */
+let rawSqlite: any = null;
+
+export function setRawSqlite(instance: any) {
+  rawSqlite = instance;
+}
+
+export function getRawSqlite(): any {
+  return rawSqlite;
+}
+
 export function setDefaultDb(dbInstance: any) {
   defaultDb = dbInstance;
 }

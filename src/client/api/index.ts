@@ -283,5 +283,77 @@ export async function saveDashboardConnectionConfig(config: Partial<DashboardCon
   });
 }
 
+// ================= Backup / Restore API =================
+export interface BackupImportResult {
+  mode: 'merge' | 'replace';
+  platform: 'node' | 'cloudflare';
+  imported: { subscriptions: number; aggregates: number; settings: number };
+  skipped: { subscriptions: number; aggregates: number; settings: number };
+  renamed: Array<{ type: 'subscription' | 'aggregate'; from: string; to: string }>;
+  regeneratedTokens: Array<{ name: string; reason: string }>;
+  warnings: string[];
+  partial?: boolean;
+  failed?: number;
+  durationMs: number;
+}
+
+export interface BackupCounts {
+  subscriptions: number;
+  aggregates: number;
+  settings: number;
+}
+
+/**
+ * Download a backup file. Uses fetch + blob instead of a plain <a href> because
+ * the endpoint requires the Authorization header.
+ */
+export async function exportBackup(): Promise<void> {
+  const token = getStoredToken();
+  const res = await fetch(`${API_BASE}/backup/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!res.ok) {
+    let message = `导出失败 (HTTP ${res.status})`;
+    try {
+      const json = await res.json();
+      if (json?.message) message = json.message;
+    } catch {
+      // ignore non-JSON error bodies
+    }
+    if (res.status === 401) {
+      clearStoredToken();
+      window.dispatchEvent(new Event('subhub:unauthorized'));
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('content-disposition') || '';
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] || 'subhub-backup.json';
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+export async function importBackup(
+  raw: string,
+  mode: 'merge' | 'replace'
+): Promise<BackupImportResult> {
+  return safeFetchJson<BackupImportResult>(`${API_BASE}/backup/import?mode=${mode}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: raw,
+  });
+}
+
+
 
 

@@ -23,7 +23,14 @@ import {
   getAuthStatus,
 } from '../../server/services/authService.js';
 import { initNodeDatabase } from '../../server/db/node.js';
-import { setDefaultDb } from '../../server/db/index.js';
+import { setDefaultDb, schema } from '../../server/db/index.js';
+import { exportBackup, importBackup } from '../../server/services/backupService.js';
+import {
+  BackupValidationError,
+  createBackupDocument,
+  parseBackup,
+  serializeBackup,
+} from '../backup/format.js';
 import net from 'net';
 import path from 'path';
 import os from 'os';
@@ -110,7 +117,7 @@ export async function executeComprehensiveTests() {
   // ----------------------------------------------------
   // Category 1: Protocol Parsers
   // ----------------------------------------------------
-  console.log('📦 [1/6] 核心协议解析器测试 (Protocol Parsers)');
+  console.log('📦 [1/7] 核心协议解析器测试 (Protocol Parsers)');
 
   runTest('Protocol Parsers', '解析 VLESS Reality 节点及参数 (XTLS Vision & Reality PubKey)', () => {
     const node = parseUri(sampleVlessReality);
@@ -272,7 +279,7 @@ proxies:
   // ----------------------------------------------------
   // Category 2: Multi-Client Converters
   // ----------------------------------------------------
-  console.log('\n🔄 [2/6] 多客户端配置转换器测试 (Converters)');
+  console.log('\n🔄 [2/7] 多客户端配置转换器测试 (Converters)');
 
   const testNodes: ProxyNode[] = [
     parseUri(sampleVlessReality)!,
@@ -350,7 +357,7 @@ proxies:
   // ----------------------------------------------------
   // Category 3: Aggregation Engine & Filter Pipeline
   // ----------------------------------------------------
-  console.log('\n⚙️ [3/6] 聚合过滤与规则引擎测试 (Engine Pipeline)');
+  console.log('\n⚙️ [3/7] 聚合过滤与规则引擎测试 (Engine Pipeline)');
 
   runTest('Engine Pipeline', '协议白名单筛选与黑名单过滤', () => {
     const group: AggregateGroup = {
@@ -487,7 +494,7 @@ proxies:
   // ----------------------------------------------------
   // Category 4: Security & Penetration Testing
   // ----------------------------------------------------
-  console.log('\n🛡️ [4/6] 系统安全与渗透防御测试 (Security & Penetration)');
+  console.log('\n🛡️ [4/7] 系统安全与渗透防御测试 (Security & Penetration)');
 
   runTest('Security - SSRF', '拦截 IPv4 私有内网地址 (127.0.0.1, 10.x, 192.168.x, 172.16-31.x)', () => {
     const privateIps = [
@@ -803,7 +810,7 @@ proxies:
   // ----------------------------------------------------
   // Category 5: User-Agent Auto-Detection & Format Routing
   // ----------------------------------------------------
-  console.log('\n📱 [5/6] 客户端 UA 自动适配与路由分发 (Client Routing)');
+  console.log('\n📱 [5/7] 客户端 UA 自动适配与路由分发 (Client Routing)');
 
   const mockDetectFormat = (ua: string): string => {
     const lowerUA = ua.toLowerCase();
@@ -846,7 +853,7 @@ proxies:
   // ----------------------------------------------------
   // Category 6: Performance & Boundary Limits
   // ----------------------------------------------------
-  console.log('\n⚡ [6/6] 性能压测与极限边界测试 (Performance & Limits)');
+  console.log('\n⚡ [6/7] 性能压测与极限边界测试 (Performance & Limits)');
 
   runTest('Performance', '千级超大规模节点池 (1000+ Nodes) 聚合流水线压力耗时', () => {
     const largePool: ProxyNode[] = [];
@@ -892,6 +899,308 @@ proxies:
       throw new Error(`处理 1200+ 节点耗时超出预期阈值 (${duration}ms > 300ms)`);
     }
     console.log(`    📊 1200+ 节点全量清洗、过滤、去重与双端配置生成总耗时: ${duration}ms (输出 ${processed.length} 个优质节点)`);
+  });
+
+  // ----------------------------------------------------
+  // Category 7: Backup export / import
+  // ----------------------------------------------------
+  console.log('\n💾 [7/7] 备份导出与恢复测试 (Backup & Restore)');
+
+  const backupNow = new Date().toISOString();
+  const backupSubId = 'sub_bk_fixture_1';
+  const backupAggId = 'agg_bk_fixture_1';
+  let backupBody = '';
+
+  await runAsyncTest('Backup', '准备备份测试数据（订阅 / 聚合 / 设置）', async () => {
+    await initOrUpdatePassword('BackupFixturePass123!');
+
+    testDb
+      .insert(schema.subscriptions)
+      .values({
+        id: backupSubId,
+        name: '备份测试订阅',
+        url: 'https://example.com/backup-test-sub',
+        autoUpdate: true,
+        updateInterval: 180,
+        nodeCount: 5,
+        status: 'active',
+        createdAt: backupNow,
+        updatedAt: backupNow,
+      })
+      .run();
+
+    testDb
+      .insert(schema.aggregates)
+      .values({
+        id: backupAggId,
+        name: '备份测试聚合',
+        token: 'backupfixturetoken0123456789abcdef',
+        subscriptionIds: JSON.stringify([backupSubId]),
+        accessCount: 7,
+        lastAccessedIp: '203.0.113.9',
+        createdAt: backupNow,
+        updatedAt: backupNow,
+      })
+      .run();
+
+    testDb
+      .insert(schema.settings)
+      .values({ key: 'clash_api_secret', value: 'backup-test-clash-secret', updatedAt: backupNow })
+      .run();
+  });
+
+  await runAsyncTest('Backup', '导出：排除认证数据并脱敏客户端 IP', async () => {
+    const exported = await exportBackup();
+    backupBody = exported.body;
+
+    const doc = JSON.parse(backupBody);
+    const settingKeys = doc.data.settings.map((item: any) => item.key);
+    if (settingKeys.includes('admin_auth')) throw new Error('导出了 admin_auth（密码哈希）');
+    if (settingKeys.includes('session_secret')) throw new Error('导出了 session_secret');
+    if (settingKeys.includes('agent_probe_heartbeat')) throw new Error('导出了运行时心跳数据');
+
+    const aggregate = doc.data.aggregates.find((item: any) => item.id === backupAggId);
+    if (!aggregate) throw new Error('导出的备集中缺少聚合规则');
+    if (aggregate.lastAccessedIp !== null) throw new Error('lastAccessedIp 未被脱敏');
+
+    const subscription = doc.data.subscriptions.find((item: any) => item.id === backupSubId);
+    if (!subscription) throw new Error('导出的备份中缺少订阅源');
+    if (!Array.isArray(subscription.subscriptionIds) && subscription.subscriptionIds !== undefined) {
+      throw new Error('订阅源字段结构异常');
+    }
+  });
+
+  await runAsyncTest('Backup', '校验：拒绝错误格式 / 高版本 / 非法 URL / 超量记录', async () => {
+    const base = JSON.parse(backupBody);
+
+    const mutate = (fn: (doc: any) => void) => {
+      const copy = JSON.parse(JSON.stringify(base));
+      fn(copy);
+      return JSON.stringify(copy);
+    };
+
+    const expectReject = (raw: string, keyword: string) => {
+      try {
+        parseBackup(raw);
+      } catch (err: any) {
+        if (!(err instanceof BackupValidationError)) {
+          throw new Error(`期望 BackupValidationError，实际 ${err?.name}: ${err?.message}`);
+        }
+        if (!err.message.includes(keyword)) {
+          throw new Error(`错误信息未包含 “${keyword}”: ${err.message}`);
+        }
+        return;
+      }
+      throw new Error(`期望被拒绝但通过了校验: ${keyword}`);
+    };
+
+    expectReject(mutate((doc) => { doc.format = 'not-subhub'; }), 'format');
+    expectReject(mutate((doc) => { doc.version = 99; }), '升级');
+    expectReject(
+      mutate((doc) => { doc.data.subscriptions[0].url = 'file:///etc/passwd'; }),
+      'http/https'
+    );
+    expectReject(
+      mutate((doc) => {
+        doc.data.subscriptions = Array.from({ length: 501 }, (_, index) => ({
+          ...doc.data.subscriptions[0],
+          id: `sub_bulk_${index}`,
+          url: `https://example.com/bulk-${index}`,
+        }));
+      }),
+      '上限'
+    );
+  });
+
+  await runAsyncTest('Backup', '覆盖导入：清空数据库后完整恢复且保留 token', async () => {
+    const doc = JSON.parse(backupBody);
+    const expectedToken = doc.data.aggregates.find((item: any) => item.id === backupAggId).token;
+
+    testDb.delete(schema.nodes).run();
+    testDb.delete(schema.aggregates).run();
+    testDb.delete(schema.subscriptions).run();
+
+    const result = await importBackup(backupBody, 'replace');
+    if (result.imported.subscriptions !== doc.data.subscriptions.length) {
+      throw new Error(`订阅导入数量不符: ${result.imported.subscriptions}`);
+    }
+    if (result.imported.aggregates !== doc.data.aggregates.length) {
+      throw new Error(`聚合导入数量不符: ${result.imported.aggregates}`);
+    }
+
+    const restoredSubscriptions = testDb.select().from(schema.subscriptions).all();
+    if (!restoredSubscriptions.find((row: any) => row.id === backupSubId)) {
+      throw new Error('订阅源未恢复');
+    }
+
+    const restoredAggregates = testDb.select().from(schema.aggregates).all();
+    const restored = restoredAggregates.find((row: any) => row.id === backupAggId);
+    if (!restored) throw new Error('聚合规则未恢复');
+    if (restored.token !== expectedToken) throw new Error('聚合 token 未按原值恢复');
+    if (restored.lastAccessedIp !== null) throw new Error('导入后 lastAccessedIp 应为空');
+  });
+
+  await runAsyncTest('Backup', '合并导入：同一文件重复导入应全部跳过', async () => {
+    const result = await importBackup(backupBody, 'merge');
+    if (result.imported.subscriptions !== 0 || result.imported.aggregates !== 0) {
+      throw new Error('重复导入产生了重复数据');
+    }
+    if (result.skipped.subscriptions === 0 || result.skipped.aggregates === 0) {
+      throw new Error('重复导入未计入 skipped');
+    }
+  });
+
+  await runAsyncTest('Backup', '合并导入：token 冲突时自动重建并上报', async () => {
+    testDb
+      .insert(schema.aggregates)
+      .values({
+        id: 'agg_bk_token_owner',
+        name: '令牌占用者',
+        token: 'fixed-conflict-token',
+        subscriptionIds: '[]',
+        createdAt: backupNow,
+        updatedAt: backupNow,
+      })
+      .run();
+
+    const doc = createBackupDocument({
+      app: { version: '1.0.0', build: 'test', platform: 'node' },
+      subscriptions: [],
+      aggregates: [
+        {
+          id: 'agg_bk_token_new',
+          name: '待导入聚合',
+          token: 'fixed-conflict-token',
+          createdAt: backupNow,
+          updatedAt: backupNow,
+        },
+      ],
+      settings: [],
+    });
+
+    const result = await importBackup(serializeBackup(doc), 'merge');
+    if (result.regeneratedTokens.length !== 1) throw new Error('未上报 token 重建');
+
+    const rows = testDb.select().from(schema.aggregates).all();
+    const inserted = rows.find((row: any) => row.id === 'agg_bk_token_new');
+    if (!inserted) throw new Error('聚合规则未导入');
+    if (inserted.token === 'fixed-conflict-token') throw new Error('冲突 token 未被替换');
+  });
+
+  await runAsyncTest('Backup', '合并导入：名称冲突自动改名', async () => {
+    const doc = createBackupDocument({
+      app: { version: '1.0.0', build: 'test', platform: 'node' },
+      subscriptions: [
+        {
+          id: 'sub_bk_rename',
+          name: '备份测试订阅',
+          url: 'https://example.com/renamed-subscription',
+          createdAt: backupNow,
+          updatedAt: backupNow,
+        },
+      ],
+      aggregates: [],
+      settings: [],
+    });
+
+    const result = await importBackup(serializeBackup(doc), 'merge');
+    if (result.renamed.length !== 1) throw new Error('名称冲突未上报改名');
+
+    const rows = testDb.select().from(schema.subscriptions).all();
+    const inserted = rows.find((row: any) => row.id === 'sub_bk_rename');
+    if (!inserted) throw new Error('订阅源未导入');
+    if (!inserted.name.endsWith('(2)')) throw new Error(`改名结果异常: ${inserted.name}`);
+  });
+
+  await runAsyncTest('Backup', '合并导入：不覆盖已有设置项', async () => {
+    const before = testDb.select().from(schema.settings).all();
+    const existing = before.find((row: any) => row.key === 'clash_api_secret');
+    if (!existing) throw new Error('测试前置设置项缺失');
+
+    const doc = createBackupDocument({
+      app: { version: '1.0.0', build: 'test', platform: 'node' },
+      subscriptions: [],
+      aggregates: [],
+      settings: [{ key: 'clash_api_secret', value: 'overwritten-secret', updatedAt: backupNow }],
+    });
+
+    const result = await importBackup(serializeBackup(doc), 'merge');
+    if (result.skipped.settings !== 1) throw new Error('已存在的设置项未被跳过');
+
+    const after = testDb.select().from(schema.settings).all();
+    const current = after.find((row: any) => row.key === 'clash_api_secret');
+    if (current?.value !== existing.value) throw new Error('合并模式覆盖了已有设置');
+  });
+
+  await runAsyncTest('Backup', '导入：认证类设置项被丢弃并产生警告', async () => {
+    const raw = JSON.stringify({
+      format: 'subhub-backup',
+      version: 1,
+      exportedAt: backupNow,
+      app: { version: '1.0.0', build: 'test', platform: 'node' },
+      data: {
+        subscriptions: [],
+        aggregates: [],
+        settings: [{ key: 'admin_auth', value: 'should-never-import', updatedAt: backupNow }],
+      },
+    });
+
+    const parsed = parseBackup(raw);
+    if (parsed.document.data.settings.length !== 0) throw new Error('认证设置项未被丢弃');
+    if (!parsed.warnings.some((warning) => warning.includes('认证'))) {
+      throw new Error('未生成认证数据警告');
+    }
+  });
+
+  await runAsyncTest('Backup', '合并导入：URL 重复时聚合引用自动重映射', async () => {
+    testDb
+      .insert(schema.subscriptions)
+      .values({
+        id: 'sub_bk_remap_owner',
+        name: '本地已有订阅',
+        url: 'https://example.com/url-remap',
+        createdAt: backupNow,
+        updatedAt: backupNow,
+      })
+      .run();
+
+    const doc = createBackupDocument({
+      app: { version: '1.0.0', build: 'test', platform: 'node' },
+      subscriptions: [
+        {
+          id: 'sub_bk_remap_incoming',
+          name: '外部导入订阅',
+          url: 'https://example.com/url-remap',
+          createdAt: backupNow,
+          updatedAt: backupNow,
+        },
+      ],
+      aggregates: [
+        {
+          id: 'agg_bk_remap',
+          name: '重映射聚合',
+          token: 'remapfixturetoken0123456789abcdef',
+          subscriptionIds: JSON.stringify(['sub_bk_remap_incoming']),
+          createdAt: backupNow,
+          updatedAt: backupNow,
+        },
+      ],
+      settings: [],
+    });
+
+    const result = await importBackup(serializeBackup(doc), 'merge');
+    if (result.imported.subscriptions !== 0) {
+      throw new Error('URL 重复的订阅不应被重复导入');
+    }
+
+    const rows = testDb.select().from(schema.aggregates).all();
+    const imported = rows.find((row: any) => row.id === 'agg_bk_remap');
+    if (!imported) throw new Error('聚合规则未导入');
+
+    const referenced = JSON.parse(imported.subscriptionIds);
+    if (referenced.length !== 1 || referenced[0] !== 'sub_bk_remap_owner') {
+      throw new Error(`聚合引用未重映射: ${imported.subscriptionIds}`);
+    }
   });
 
   // Summary

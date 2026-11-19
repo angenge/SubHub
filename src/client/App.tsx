@@ -14,6 +14,7 @@ const SubscriptionModal = lazy(() => import('./components/SubscriptionModal.js')
 const AggregateModal = lazy(() => import('./components/AggregateModal.js').then(m => ({ default: m.AggregateModal })));
 const ExportModal = lazy(() => import('./components/ExportModal.js').then(m => ({ default: m.ExportModal })));
 const ChangePasswordModal = lazy(() => import('./components/ChangePasswordModal.js').then(m => ({ default: m.ChangePasswordModal })));
+const SettingsModal = lazy(() => import('./components/SettingsModal.js').then(m => ({ default: m.SettingsModal })));
 const ProbeModal = lazy(() => import('./components/ProbeModal.js').then(m => ({ default: m.ProbeModal })));
 const SyncProgressModal = lazy(() => import('./components/SyncProgressModal.js').then(m => ({ default: m.SyncProgressModal })));
 
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [capabilities, setCapabilities] = useState<SystemCapabilities | null>(null);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Business state
   const [currentTab, setCurrentTab] = useState<TabType>(() => {
@@ -494,6 +496,7 @@ export const App: React.FC = () => {
         hasPasswordEnv={hasPasswordEnv}
         onChangePasswordClick={() => setIsChangePasswordModalOpen(true)}
         onLogoutClick={handleLogout}
+        onSettingsClick={() => setIsSettingsModalOpen(true)}
       />
 
       {/* Main Container (Extra bottom padding on mobile for bottom navigation bar) */}
@@ -635,6 +638,14 @@ export const App: React.FC = () => {
             onClose={() => setIsChangePasswordModalOpen(false)}
             onSuccess={() => showToast('密码修改成功')}
             hasPasswordEnv={hasPasswordEnv}
+          />
+        )}
+
+        {isSettingsModalOpen && (
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            onImported={loadAllData}
           />
         )}
 

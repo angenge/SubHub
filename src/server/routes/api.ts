@@ -48,6 +48,8 @@ import {
   processAgentReport,
 } from '../services/agentService.js';
 import { checkRateLimit, getClientIpFromContext } from '../utils/rateLimiter.js';
+import { exportBackup, importBackup } from '../services/backupService.js';
+import { BackupValidationError, MAX_BACKUP_BYTES } from '../../core/backup/format.js';
 
 export const api = new Hono();
 
@@ -234,6 +236,75 @@ api.use('*', async (c, next) => {
   }
 
   return next();
+});
+
+// ================= Backup / Restore (Protected) =================
+// Exported files contain subscription URLs (= airport credentials) and
+// aggregate tokens, so these endpoints sit behind the auth middleware above
+// and are rate limited in case a session token leaks.
+
+api.get('/backup/export', async (c) => {
+  const ip = getClientIpFromContext(c);
+  const limit = checkRateLimit('backup-export', ip, { maxRequests: 10, windowMs: 60_000 });
+  if (!limit.allowed) {
+    return c.json(
+      { success: false, message: `导出过于频繁，请 ${limit.retryAfterSec} 秒后再试` },
+      429
+    );
+  }
+
+  try {
+    const { filename, body } = await exportBackup();
+    return c.body(body, 200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+    });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message || '导出备份失败' }, 500);
+  }
+});
+
+api.post('/backup/import', async (c) => {
+  const ip = getClientIpFromContext(c);
+  const limit = checkRateLimit('backup-import', ip, { maxRequests: 5, windowMs: 60_000 });
+  if (!limit.allowed) {
+    return c.json(
+      { success: false, message: `导入过于频繁，请 ${limit.retryAfterSec} 秒后再试` },
+      429
+    );
+  }
+
+  const mode = c.req.query('mode') === 'replace' ? 'replace' : 'merge';
+
+  const declaredLength = Number(c.req.header('content-length') || '0');
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BACKUP_BYTES) {
+    return c.json(
+      { success: false, message: `备份文件超过大小上限（${Math.round(MAX_BACKUP_BYTES / 1024 / 1024)} MB）` },
+      413
+    );
+  }
+
+  let raw: string;
+  try {
+    raw = await c.req.text();
+  } catch {
+    return c.json({ success: false, message: '无法读取上传的备份内容' }, 400);
+  }
+
+  if (!raw.trim()) {
+    return c.json({ success: false, message: '备份文件内容为空' }, 400);
+  }
+
+  try {
+    const result = await importBackup(raw, mode);
+    return c.json({ success: true, data: result });
+  } catch (err: any) {
+    if (err instanceof BackupValidationError) {
+      return c.json({ success: false, message: err.message }, 400);
+    }
+    return c.json({ success: false, message: err.message || '导入备份失败' }, 500);
+  }
 });
 
 // ================= Protected Routes =================

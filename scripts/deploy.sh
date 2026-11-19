@@ -26,6 +26,9 @@ if [ -n "$TARGET" ]; then
 else
   echo "==> pulling latest main"
   git fetch origin
+  # A previous rollback leaves the repo in detached HEAD, so return to main
+  # explicitly before pulling.
+  git checkout main
   git pull --ff-only origin main
 fi
 
