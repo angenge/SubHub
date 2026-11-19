@@ -1,13 +1,22 @@
 services:
   subhub:
-    build: .
+    build:
+      context: .
+      args:
+        # Stamped into GET /health as "build" so you can tell which revision runs.
+        SUBHUB_BUILD_ID: ${SUBHUB_BUILD_ID:-dev}
     container_name: subhub
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # Bind address and port are configurable via .env, so this file can stay
+      # pristine in git: no merge conflicts when pulling a new release.
+      - "${SUBHUB_BIND:-0.0.0.0}:${SUBHUB_PORT:-3000}:3000"
     environment:
       - PORT=3000
       - HOST=0.0.0.0
       - DATA_DIR=/app/data
+      - TRUST_PROXY=${TRUST_PROXY:-false}
     volumes:
-      - ./data:/app/data
+      # Point SUBHUB_DATA_DIR outside the git working tree so that
+      # "git clean -xdf" or a fresh clone can never destroy the database.
+      - "${SUBHUB_DATA_DIR:-./data}:/app/data"

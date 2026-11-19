@@ -1,0 +1,18 @@
+# Keep the build context small and prevent host artifacts from leaking into
+# the image. The Dockerfile installs its own dependencies with "npm ci".
+node_modules
+dist
+data
+.git
+.gitignore
+.gitattributes
+.wrangler
+third_party
+
+# Local configuration and secrets never belong in an image.
+.env
+.env.*
+*.log
+*.db
+*.db-wal
+*.db-shm

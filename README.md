@@ -143,9 +143,17 @@ npx wrangler deploy
 
 #### 1. 使用 Docker Compose（最便捷）
 ```bash
+# 首次部署：准备本地配置（.env 已被 git 忽略，不会被提交）
+cp .env.example .env
+vi .env          # 按需修改端口 / 绑定地址 / 数据目录
+
 # 构建并后台启动
 docker compose up -d --build
 ```
+
+> `.env` 支持 `SUBHUB_BIND`、`SUBHUB_PORT`、`SUBHUB_DATA_DIR`、`TRUST_PROXY` 四个变量，
+> 详见 `.env.example`。把这些部署差异放在 `.env` 里，`docker-compose.yml` 就能保持原样，
+> 以后 `git pull` 不会产生冲突。
 
 #### 2. 使用标准 Docker 命令
 ```bash
@@ -198,6 +206,63 @@ docker inspect subhub --format '{{.State.Health.Status}}'
 ```bash
 docker build --build-arg SUBHUB_BUILD_ID=$(git rev-parse --short HEAD) -t subhub:latest .
 ```
+
+#### 4. 数据备份
+
+数据库是单个 SQLite 文件，**必须定期备份**。仓库自带基于 SQLite 在线备份 API 的脚本（WAL 模式下也能得到一致快照，无需停机）：
+
+```bash
+# 备份到 $SUBHUB_DATA_DIR/backups/，默认保留 7 天
+./scripts/backup-db.sh
+
+# 自定义保留天数
+KEEP_DAYS=14 ./scripts/backup-db.sh
+```
+
+建议加入 crontab（每天 03:15）：
+
+```cron
+15 3 * * * /path/to/SubHub/scripts/backup-db.sh >> /path/to/data/subhub/backup.log 2>&1
+```
+
+恢复时停止容器，把备份文件覆盖回 `subhub.db`（并删除同目录的 `-wal` / `-shm`）后重启即可。
+
+#### 5. Git 化部署与回滚（推荐）
+
+把服务器上的项目目录当作**纯 Git 工作区**，数据放在仓库外：
+
+```
+/home/deploy/muse-workspace/
+├── projects/subhub/      ← git clone 出来的工作区，可随时丢弃重建
+└── data/subhub/          ← 数据库 + 备份，不在仓库内
+```
+
+`.env` 中设置：
+
+```bash
+SUBHUB_DATA_DIR=/home/deploy/muse-workspace/data/subhub
+```
+
+日常升级：
+
+```bash
+./scripts/deploy.sh           # git pull + 构建 + 重启 + 健康检查
+```
+
+回滚到任意历史版本：
+
+```bash
+./scripts/deploy.sh v1.0.0    # 或 git checkout <tag> && docker compose up -d --build
+```
+
+发布时打 tag，`git log` 就是完整的发布历史：
+
+```bash
+git tag -a v1.0.0 -m "release: first stable"
+git push origin v1.0.0
+```
+
+> 因为数据目录和 `.env` 都在工作区之外，切换版本**永远不会碰到数据库**。
 
 ---
 
