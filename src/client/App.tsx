@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar, TabType } from './components/Navbar.js';
 import { OverviewTab } from './pages/OverviewTab.js';
 import { LoginPage } from './pages/LoginPage.js';
+import type { SyncProgressState, SyncItemLog } from './components/SyncProgressModal.js';
 
 // Lazy loaded heavy tabs and modals to optimize initial bundle size
 const SubscriptionsTab = lazy(() => import('./pages/SubscriptionsTab.js').then(m => ({ default: m.SubscriptionsTab })));

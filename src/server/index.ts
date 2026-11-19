@@ -7,11 +7,12 @@ import { subRouter } from './routes/sub.js';
 import { initNodeScheduler } from './scheduler/cron.node.js';
 import { initNodeDatabase } from './db/node.js';
 import { setDefaultDb } from './db/index.js';
+import { APP_VERSION } from '../core/version.js';
 import path from 'path';
 import fs from 'fs';
 
 // Initialize SQLite for Node.js
-const { db: nodeDb } = initNodeDatabase();
+const { db: nodeDb, sqlite: nodeSqlite } = initNodeDatabase();
 setDefaultDb(nodeDb);
 
 const app = new Hono();
@@ -23,8 +24,32 @@ app.use('*', cors());
 app.route('/api', api);
 app.route('/sub', subRouter);
 
-// Health check
-app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString() }));
+// Health check (used by the Docker HEALTHCHECK and external monitoring).
+// Performs a real SQLite round-trip so a broken/stuck database is reported
+// as "degraded" instead of a misleading 200.
+app.get('/health', (c) => {
+  const startedAt = Date.now();
+  let dbOk = false;
+  try {
+    nodeSqlite.prepare('SELECT 1').get();
+    dbOk = true;
+  } catch (err) {
+    console.error('[health] SQLite probe failed:', (err as Error).message);
+  }
+
+  const payload = {
+    version: APP_VERSION,
+    build: process.env.SUBHUB_BUILD_ID || 'dev',
+    platform: 'node',
+    db: dbOk,
+    latencyMs: Date.now() - startedAt,
+    time: new Date().toISOString(),
+  };
+
+  return dbOk
+    ? c.json({ status: 'ok', ...payload }, 200)
+    : c.json({ status: 'degraded', ...payload }, 503);
+});
 
 // Production: Serve static React frontend if dist/client exists
 const clientDist = path.resolve(process.cwd(), 'dist/client');

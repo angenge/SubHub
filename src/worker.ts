@@ -6,6 +6,7 @@ import { api } from './server/routes/api.js';
 import { subRouter } from './server/routes/sub.js';
 import { dbContext, schema } from './server/db/index.js';
 import { runScheduledMaintenance } from './server/scheduler/cron.js';
+import { APP_VERSION } from './core/version.js';
 
 type Bindings = {
   DB: D1Database;
@@ -32,8 +33,33 @@ app.use('*', async (c, next) => {
 app.route('/api', api);
 app.route('/sub', subRouter);
 
-// Health check
-app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString(), platform: 'cloudflare' }));
+// Health check. D1 has no long-lived connection, so a cheap SELECT 1 is enough
+// to prove the database binding actually works.
+app.get('/health', async (c) => {
+  const startedAt = Date.now();
+  let dbOk = false;
+  try {
+    if (c.env?.DB) {
+      await c.env.DB.prepare('SELECT 1').first();
+      dbOk = true;
+    }
+  } catch (err) {
+    console.error('[health] D1 probe failed:', (err as Error).message);
+  }
+
+  const payload = {
+    version: APP_VERSION,
+    build: (c.env as any)?.SUBHUB_BUILD_ID || 'dev',
+    platform: 'cloudflare',
+    db: dbOk,
+    latencyMs: Date.now() - startedAt,
+    time: new Date().toISOString(),
+  };
+
+  return dbOk
+    ? c.json({ status: 'ok', ...payload }, 200)
+    : c.json({ status: 'degraded', ...payload }, 503);
+});
 
 // Static Assets fallback (Workers Static Assets with smart caching)
 app.all('*', async (c) => {

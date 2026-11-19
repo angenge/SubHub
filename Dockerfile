@@ -32,4 +32,15 @@ COPY --from=builder /app/dist ./dist
 VOLUME ["/app/data"]
 EXPOSE 3000
 
+# Injected at build time (docker build --build-arg SUBHUB_BUILD_ID=$(git rev-parse --short HEAD))
+# and surfaced by GET /health so you can tell which revision is running.
+ARG SUBHUB_BUILD_ID=dev
+ENV SUBHUB_BUILD_ID=$SUBHUB_BUILD_ID
+
+# node:22-slim ships without curl/wget, so probe /health with Node's built-in fetch.
+# A 503 (database unreachable) marks the container unhealthy; plain Docker will not
+# auto-restart on unhealthy, which is intentional to avoid crash loops.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+
 CMD ["node", "dist/server/index.js"]

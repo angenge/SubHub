@@ -163,6 +163,42 @@ docker run -d \
 
 启动完成后，在浏览器访问 `http://<你的服务器IP>:3000` 即可进入管理后台。
 
+#### 3. 健康检查
+
+镜像内置了 `HEALTHCHECK`，每 30 秒探测一次 `/health`：
+
+```bash
+docker ps --format '{{.Names}}\t{{.Status}}'     # 期望 Up ... (healthy)
+docker inspect subhub --format '{{.State.Health.Status}}'
+```
+
+`GET /health` 会真实执行一次 SQLite/D1 查询，返回：
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "build": "8ad0eee",
+  "platform": "node",
+  "db": true,
+  "latencyMs": 1,
+  "time": "2026-11-19T12:00:00.000Z"
+}
+```
+
+| 情况 | HTTP | 含义 |
+| :--- | :--- | :--- |
+| 数据库正常 | `200` | 容器标记为 `healthy` |
+| 数据库不可用 | `503` | 容器标记为 `unhealthy`，`status` 为 `degraded` |
+
+> 提示：原生 Docker 在容器变为 `unhealthy` 时**不会自动重启**，只会改变状态显示（避免数据库损坏时陷入重启风暴）。如需自动重启，可配合 `willfarrell/autoheal` 之类的守护容器。
+
+构建时可以把当前版本号写进 `build` 字段，便于确认线上跑的是哪个提交：
+
+```bash
+docker build --build-arg SUBHUB_BUILD_ID=$(git rev-parse --short HEAD) -t subhub:latest .
+```
+
 ---
 
 ### 方式三：本地 / Linux 服务器直接运行 (Node.js)
